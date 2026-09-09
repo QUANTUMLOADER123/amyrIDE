@@ -237,7 +237,7 @@ void c_settings_panel::draw(c_ide_app& app)
     render_tools(app);
 
     ImGui::Dummy(ImVec2(0.0f, 12.0f * unit));
-    ImGui::TextColored(colors.text_faint, "amyrIDE — собран с любовью, работает через твой endpoint");
+    ImGui::TextColored(colors.text_faint, "Nimbus — собран с любовью, работает через твой endpoint");
     ImGui::EndChild();
     ImGui::EndChild();
     ImGui::PopStyleVar(2);

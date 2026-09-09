@@ -56,46 +56,46 @@ namespace
     const char* tool_label(const std::string& name, bool running)
     {
         if (name == "list_files")
-            return running ? "изучает файлы" : "изучил файлы";
+            return running ? "Изучает файлы" : "Изучил файлы";
         if (name == "list_dir")
-            return running ? "смотрит папку" : "посмотрел папку";
+            return running ? "Смотрит папку" : "Посмотрел папку";
         if (name == "workspace_info")
-            return running ? "смотрит структуру проекта" : "изучил проект";
+            return running ? "Смотрит проект" : "Изучил проект";
         if (name == "read_file")
-            return running ? "читает файл" : "прочитал файл";
+            return running ? "Читает файл" : "Прочитал файл";
         if (name == "file_info")
-            return running ? "смотрит файл" : "посмотрел файл";
+            return running ? "Смотрит файл" : "Посмотрел файл";
         if (name == "write_file")
-            return running ? "создаёт файл" : "создал файл";
+            return running ? "Создаёт файл" : "Создал файл";
         if (name == "append_file")
-            return running ? "дописывает файл" : "дописал файл";
+            return running ? "Дописывает файл" : "Дописал файл";
         if (name == "edit_file")
-            return running ? "правит файл" : "изменил файл";
+            return running ? "Правит файл" : "Изменил файл";
         if (name == "replace_lines")
-            return running ? "переписывает строки" : "переписал строки";
+            return running ? "Переписывает строки" : "Переписал строки";
         if (name == "insert_lines")
-            return running ? "вставляет строки" : "вставил строки";
+            return running ? "Вставляет строки" : "Вставил строки";
         if (name == "delete_lines")
-            return running ? "удаляет строки" : "удалил строки";
+            return running ? "Удаляет строки" : "Удалил строки";
         if (name == "create_directory")
-            return running ? "создаёт папку" : "создал папку";
+            return running ? "Создаёт папку" : "Создал папку";
         if (name == "copy_path")
-            return running ? "копирует" : "скопировал";
+            return running ? "Копирует" : "Скопировал";
         if (name == "delete_path")
-            return running ? "удаляет" : "удалил";
+            return running ? "Удаляет" : "Удалил";
         if (name == "move_path")
-            return running ? "перемещает" : "переместил";
+            return running ? "Перемещает" : "Переместил";
         if (name == "search_files")
-            return running ? "ищет файлы" : "поиск файлов";
+            return running ? "Ищет файлы" : "Нашёл файлы";
         if (name == "search_text")
-            return running ? "ищет в коде" : "поиск в коде";
+            return running ? "Ищет в коде" : "Поиск в коде";
         if (name == "set_plan")
-            return running ? "строит план" : "обновил план";
+            return running ? "Строит план" : "Обновил план";
         if (name == "run_command")
-            return running ? "выполняет команду" : "команда выполнена";
+            return running ? "Выполняет команду" : "Выполнил команду";
         if (name == "run_powershell")
-            return running ? "запускает powershell" : "powershell выполнен";
-        return running ? "работает" : "готово";
+            return running ? "Запускает PowerShell" : "Выполнил PowerShell";
+        return running ? "Работает" : "Готово";
     }
 
     std::string tool_subtitle(const std::string& name, const std::string& arguments_json)
@@ -281,9 +281,7 @@ void c_chat_panel::render_header(c_ide_app& app)
 
     ImGui::SetCursorScreenPos(ImVec2(logo_center.x + 16.0f * unit, logo_center.y - ImGui::GetTextLineHeight() * 0.5f));
     ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase);
-    ImGui::TextColored(colors.text, "%s", "amyr");
-    ImGui::SameLine(0.0f, 0.0f);
-    ImGui::TextColored(theme.accent(), "%s", "IDE");
+    ImGui::TextColored(colors.text, "%s", "Nimbus");
     ImGui::PopFont();
 
     if (app.workspace.valid)
@@ -383,7 +381,7 @@ void c_chat_panel::render_history(c_ide_app& app)
         return;
     }
 
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(9.0f * unit, 4.0f * unit));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(9.0f * unit, 6.0f * unit));
     float wrap_width = ImGui::GetContentRegionAvail().x - 22.0f * unit;
     for (size_t i = 0; i < history.size(); ++i)
     {
@@ -429,18 +427,15 @@ void c_chat_panel::render_history(c_ide_app& app)
     }
     ImGui::PopStyleVar();
 
+    bool busy = app.ai.busy();
     bool stick = ImGui::GetScrollY() + ImGui::GetWindowHeight() >= ImGui::GetScrollMaxY() - 90.0f;
-    float stream_progress = static_cast<float>(history.size()) + (app.ai.busy() ? 1.0f : 0.0f);
-    if (stream_progress != last_stream_size)
-    {
-        autoscroll = stick;
-        last_stream_size = stream_progress;
-    }
-    else if (stick)
+    float stream_progress = static_cast<float>(history.size()) + (busy ? 1.0f : 0.0f);
+    if (stream_progress != last_stream_size && stick)
         autoscroll = true;
-    else if (ImGui::GetScrollY() < ImGui::GetScrollMaxY() - 90.0f)
+    last_stream_size = stream_progress;
+    if (!busy)
         autoscroll = false;
-    if (autoscroll)
+    if (autoscroll && busy && stick)
         ImGui::SetScrollHereY(1.0f);
     ImGui::EndChild();
 }
@@ -569,36 +564,35 @@ void c_chat_panel::render_message(c_ide_app& app, const message_t& message, int 
     ImGui::PushID(str::format("msg_%d", message_index).c_str());
     if (is_user)
     {
-        std::string label = "ты";
-        float label_width = ImGui::CalcTextSize(label.c_str()).x;
-        float indent = wrap_width - wrap_width * 0.82f;
+        float indent = wrap_width * 0.14f;
+        float bubble_width = wrap_width - indent;
         ImGui::Indent(indent);
         ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.82f);
-        ImGui::TextColored(colors.text_faint, "%s", label.c_str());
+        ImGui::TextColored(colors.text_faint, "%s", "ты");
         ImGui::PopFont();
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.10f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f * unit, 9.0f * unit));
-        ImGui::BeginChild("##user_bubble", ImVec2(wrap_width - indent, 0.0f), ImGuiChildFlags_AutoResizeY);
-        render_markdown(app, parse_markdown(message.content), wrap_width - indent - 28.0f * unit);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * unit, 12.0f * unit));
+        ImGui::BeginChild("##user_bubble", ImVec2(bubble_width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        render_markdown(app, parse_markdown(message.content), bubble_width - 34.0f * unit);
         ImGui::EndChild();
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
         ImGui::Unindent(indent);
-        ImGui::Dummy(ImVec2(0.0f, 10.0f * unit));
+        ImGui::Dummy(ImVec2(0.0f, 12.0f * unit));
         ImGui::PopID();
         return;
     }
 
     ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.82f);
-    ImGui::TextColored(theme.accent(), "%s", "amyr");
+    ImGui::TextColored(theme.accent(), "%s", "nimbus");
     ImGui::PopFont();
     ImGui::SameLine(0.0f, 8.0f * unit);
     if (message.tool_calls.empty() && !message.content.empty())
         ImGui::TextColored(colors.text_faint, "%d токенов", message.token_estimate);
     if (!message.tool_calls.empty())
-        ImGui::TextColored(colors.text_faint, "%zu %s", message.tool_calls.size(), message.tool_calls.size() > 1 ? "инструмента" : "инструмент");
+        ImGui::TextColored(colors.text_faint, "%zu %s", message.tool_calls.size(), message.tool_calls.size() > 1 ? "инструментов" : "инструмент");
 
     if (!message.content.empty())
     {
@@ -610,14 +604,6 @@ void c_chat_panel::render_message(c_ide_app& app, const message_t& message, int 
         ImGui::Indent(2.0f * unit);
         render_markdown(app, parse_markdown(shown), wrap_width - 4.0f * unit);
         ImGui::Unindent(2.0f * unit);
-    }
-
-    if (!message.content.empty())
-    {
-        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly) ? 1.0f : 0.45f);
-        if (icon_button(theme, icon_copy, "##copy_msg", "копировать ответ", 0.0f))
-            ImGui::SetClipboardText(message.content.c_str());
-        ImGui::PopStyleVar();
     }
     ImGui::PopID();
     ImGui::Dummy(ImVec2(0.0f, 12.0f * unit));
@@ -645,43 +631,70 @@ void c_chat_panel::render_tool_card(c_ide_app& app, const tool_call_t& call, int
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, app.config.animations ? appear : 1.0f);
     ImGui::Indent(14.0f * unit);
 
-    float card_height = ImGui::GetTextLineHeight() + 12.0f * unit;
+    float card_height = ImGui::GetTextLineHeight() + 18.0f * unit;
     ImVec2 card_min = ImGui::GetCursorScreenPos();
     if (app.config.animations)
         card_min.y += (1.0f - appear) * 8.0f * unit;
     ImGui::SetCursorScreenPos(card_min);
 
     bool clickable = status.has_output && !status.details.empty();
+    float card_width = wrap_width - 14.0f * unit;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.panel, 0.85f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f * unit);
-    ImGui::BeginChild("##tool_card", ImVec2(wrap_width - 14.0f * unit, card_height), ImGuiChildFlags_Borders);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f * unit);
-    ImGui::Indent(11.0f * unit);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 11.0f * unit);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f * unit, 8.0f * unit));
+    ImGui::BeginChild("##tool_card", ImVec2(card_width, card_height), ImGuiChildFlags_Borders);
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    float right_local = ImGui::GetWindowWidth() - 13.0f * unit;
 
     ImVec2 icon_pos = ImGui::GetCursorScreenPos();
     float icon_line = ImGui::GetTextLineHeight();
-    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(icon_pos.x - 5.0f * unit, icon_pos.y - 4.0f * unit), ImVec2(icon_pos.x + icon_line + 5.0f * unit, icon_pos.y + icon_line + 4.0f * unit), running || !status.has_output ? theme.accent_u32(0.14f) : ImGui::ColorConvertFloat4ToU32(theme.with_alpha(status.ok ? colors.success : colors.danger, 0.13f)), 7.0f * unit);
-    ImGui::TextColored(running || !status.has_output ? theme.accent() : status.ok ? colors.success : colors.danger, "%s", icon);
+    float icon_box = icon_line + 8.0f * unit;
+    draw->AddRectFilled(ImVec2(icon_pos.x - 4.0f * unit, icon_pos.y - 4.0f * unit), ImVec2(icon_pos.x + icon_line + 4.0f * unit, icon_pos.y + icon_line + 4.0f * unit), running || !status.has_output ? theme.accent_u32(0.16f) : ImGui::ColorConvertFloat4ToU32(theme.with_alpha(status.ok ? colors.success : colors.danger, 0.15f)), 8.0f * unit);
+    draw->AddText(nullptr, icon_line * 0.92f, ImVec2(icon_pos.x + (icon_line - ImGui::CalcTextSize(icon).x) * 0.5f, icon_pos.y), ImGui::ColorConvertFloat4ToU32(running || !status.has_output ? theme.accent() : status.ok ? colors.success : colors.danger), icon);
+    ImGui::Dummy(ImVec2(icon_box, icon_line));
     ImGui::SameLine(0.0f, 10.0f * unit);
-    ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.88f);
-    ImGui::TextColored(status.ok ? colors.text_dim : colors.danger, "%s", label);
-    ImGui::PopFont();
 
-    if (!subtitle.empty())
+    float label_size = ImGui::CalcTextSize(label.c_str()).x;
+    float path_size = subtitle.empty() ? 0.0f : ImGui::CalcTextSize(subtitle.c_str()).x + ImGui::CalcTextSize(" â ").x;
+    float tail_width = 26.0f * unit;
+    if (status.has_stats)
+        tail_width = ImGui::CalcTextSize("+000 −000").x + 20.0f * unit;
+    float space_left = right_local - ImGui::GetCursorPosX() - tail_width;
+    std::string shown_path = subtitle;
+    if (path_size > space_left && !subtitle.empty())
     {
-        ImGui::SameLine(0.0f, 8.0f * unit);
-        ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.80f);
-        ImGui::TextColored(colors.text_faint, "%s", subtitle.c_str());
+        while (!shown_path.empty() && ImGui::CalcTextSize(shown_path.c_str()).x + ImGui::CalcTextSize(" â ...").x > space_left)
+            shown_path.pop_back();
+        shown_path = str::trim(shown_path) + "...";
+    }
+
+    ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.90f);
+    ImGui::TextColored(status.ok || running ? colors.text : colors.danger, "%s", label);
+    ImGui::PopFont();
+    if (!shown_path.empty())
+    {
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.85f);
+        ImGui::TextColored(colors.text_dim, " â %s", shown_path.c_str());
         ImGui::PopFont();
     }
 
-    if (status.has_stats)
+    if (running || !status.has_output)
+    {
+        ImVec2 center(ImGui::GetWindowPos().x + right_local - 8.0f * unit, ImGui::GetWindowPos().y + card_height * 0.5f);
+        float phase = std::fmod(now * 2.2f, 1.0f);
+        float angle = phase * 6.28318f;
+        draw->AddCircle(center, 6.5f * unit, theme.accent_u32(0.22f), 24, 2.0f * unit);
+        draw->AddLine(ImVec2(center.x + std::cos(angle) * 6.5f * unit, center.y + std::sin(angle) * 6.5f * unit), ImVec2(center.x + std::cos(angle + 1.9f) * 6.5f * unit, center.y + std::sin(angle + 1.9f) * 6.5f * unit), theme.accent_u32(0.95f), 2.0f * unit);
+    }
+    else if (status.has_stats)
     {
         std::string plus = str::format("+%d", status.added);
         std::string minus = str::format("−%d", status.removed);
-        float stats_width = ImGui::CalcTextSize(plus.c_str()).x + ImGui::CalcTextSize(minus.c_str()).x + 14.0f * unit + (clickable ? 16.0f * unit : 0.0f);
-        ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - stats_width);
-        ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.82f);
+        float stats_width = ImGui::CalcTextSize(plus.c_str()).x + ImGui::CalcTextSize(minus.c_str()).x + 6.0f * unit;
+        ImGui::SameLine(right_local - stats_width);
+        ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.85f);
         ImGui::TextColored(colors.success, "%s", plus.c_str());
         ImGui::SameLine(0.0f, 6.0f * unit);
         ImGui::TextColored(colors.danger, "%s", minus.c_str());
@@ -689,24 +702,12 @@ void c_chat_panel::render_tool_card(c_ide_app& app, const tool_call_t& call, int
     }
     else if (clickable)
     {
-        ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 14.0f * unit);
+        ImGui::SameLine(right_local - 14.0f * unit);
         ImGui::TextColored(colors.text_faint, "%s", state.expanded ? icon_arrow_up : icon_arrow_down);
     }
 
-    if (running || !status.has_output)
-    {
-        float spin_x = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 18.0f * unit;
-        ImVec2 center(ImGui::GetWindowPos().x + spin_x, ImGui::GetCursorScreenPos().y + icon_line * 0.5f);
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        float phase = std::fmod(now * 2.2f, 1.0f);
-        draw->AddCircle(center, 6.0f * unit, theme.accent_u32(0.25f), 24, 2.0f * unit);
-        float angle = phase * 6.28318f;
-        draw->AddLine(ImVec2(center.x + std::cos(angle) * 6.0f * unit, center.y + std::sin(angle) * 6.0f * unit), ImVec2(center.x + std::cos(angle + 1.8f) * 6.0f * unit, center.y + std::sin(angle + 1.8f) * 6.0f * unit), theme.accent_u32(0.95f), 2.0f * unit);
-    }
-
-    ImGui::Unindent(11.0f * unit);
     ImGui::EndChild();
-    ImGui::PopStyleVar();
+    ImGui::PopStyleVar(2);
     ImGui::PopStyleColor();
 
     if (clickable && ImGui::IsItemClicked())
@@ -716,16 +717,15 @@ void c_chat_panel::render_tool_card(c_ide_app& app, const tool_call_t& call, int
 
     if (state.expanded && clickable)
     {
-        std::vector<std::string> detail_lines;
-        detail_lines = str::split(status.details, '\n');
         float line_height = ImGui::GetTextLineHeight();
-        float max_detail = 220.0f * unit;
-        float detail_height = std::min(max_detail, line_height * static_cast<float>(detail_lines.size()) + 16.0f * unit);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.background, 0.9f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
-        ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.78f);
-        ImGui::BeginChild("##tool_details", ImVec2(wrap_width - 14.0f * unit, detail_height), ImGuiChildFlags_Borders);
-        ImGui::TextColored(colors.text_dim, "%s", status.details.c_str());
+        float detail_height = std::min(240.0f * unit, line_height * (static_cast<float>(str::split(status.details, '\n').size()) + 0.6f) + 18.0f * unit);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.background, 0.92f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f * unit);
+        ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.80f);
+        ImGui::BeginChild("##tool_details", ImVec2(card_width, detail_height), ImGuiChildFlags_Borders);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+        ImGui::InputTextMultiline("##details", &status.details, ImVec2(0.0f, 0.0f), ImGuiInputTextFlags_ReadOnly);
+        ImGui::PopStyleColor();
         ImGui::EndChild();
         ImGui::PopFont();
         ImGui::PopStyleVar();
@@ -800,6 +800,11 @@ void c_chat_panel::render_composer(c_ide_app& app)
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
     bool submitted = ImGui::InputTextMultiline("##chat_input", &input, ImVec2(0.0f, inner_height), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::PopStyleColor();
+    if (input.empty() && !ImGui::IsItemActive())
+    {
+        ImVec2 input_min = ImGui::GetItemRectMin();
+        ImGui::GetWindowDrawList()->AddText(ImVec2(input_min.x + 7.0f * unit, input_min.y + 7.0f * unit), ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.text_faint, 0.85f)), "спроси что-нибудь о проекте...");
+    }
     if (input_focus_requested)
     {
         ImGui::SetKeyboardFocusHere(-1);

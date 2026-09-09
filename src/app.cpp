@@ -137,7 +137,7 @@ void c_ide_app::export_conversation()
     {
         if (message.role == "tool")
             continue;
-        file << (message.role == "user" ? "## ты\n\n" : "## amyr\n\n") << message.content << "\n\n";
+        file << (message.role == "user" ? "## ты\n\n" : "## nimbus\n\n") << message.content << "\n\n";
     }
     toasts.push("экспортировано: " + target, icon_download, theme.palette().success);
 }
@@ -300,7 +300,7 @@ void c_ide_app::draw_welcome()
     draw->AddText(nullptr, 30.0f * unit, ImVec2(center.x - icon_size.x * 0.5f, center.y - icon_size.y * 0.5f), theme_ref.accent_u32(0.98f), logo_icon);
 
     float y = center.y + 58.0f * unit;
-    const char* title = "amyrIDE";
+    const char* title = "Nimbus";
     float title_size_value = ImGui::GetStyle().FontSizeBase * 2.2f;
     ImVec2 title_size = theme_ref.font_bold->CalcTextSizeA(title_size_value, 32768.0f, 0.0f, title);
     draw->AddText(theme_ref.font_bold, title_size_value, ImVec2(center.x - title_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(colors.text), title);
@@ -370,11 +370,16 @@ void c_ide_app::draw_titlebar(void* hwnd)
     ImVec2 logo_center(24.0f * unit, logo_center_y);
     float pulse = 0.5f + 0.5f * std::sin(anim::time_now() * 1.8f);
     draw->AddCircleFilled(logo_center, 13.0f * unit + pulse * 1.5f * unit, theme_ref.accent_u32(0.14f), 32);
-    ImVec2 icon_size = ImGui::CalcTextSize(icon_wand_magic_sparkles);
-    draw->AddText(nullptr, 15.0f * unit, ImVec2(logo_center.x - icon_size.x * 0.5f, logo_center_y - icon_size.y * 0.5f), theme_ref.accent_u32(0.95f), icon_wand_magic_sparkles);
+    float ray = 6.5f * unit + pulse * 0.7f * unit;
+    draw->AddLine(ImVec2(logo_center.x, logo_center.y - ray), ImVec2(logo_center.x, logo_center.y + ray), theme_ref.accent_u32(0.95f), 2.4f * unit);
+    draw->AddLine(ImVec2(logo_center.x - ray, logo_center.y), ImVec2(logo_center.x + ray, logo_center.y), theme_ref.accent_u32(0.95f), 2.4f * unit);
+    float diag = ray * 0.45f;
+    draw->AddLine(ImVec2(logo_center.x - diag, logo_center.y - diag), ImVec2(logo_center.x + diag, logo_center.y + diag), theme_ref.accent_u32(0.55f), 1.6f * unit);
+    draw->AddLine(ImVec2(logo_center.x - diag, logo_center.y + diag), ImVec2(logo_center.x + diag, logo_center.y - diag), theme_ref.accent_u32(0.55f), 1.6f * unit);
+    draw->AddCircleFilled(logo_center, 1.8f * unit, theme_ref.accent_u32(1.0f), 12);
 
     ImGui::PushFont(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 0.98f);
-    draw->AddText(ImVec2(46.0f * unit, logo_center_y - ImGui::CalcTextSize("amyrIDE").y * 0.5f), ImGui::ColorConvertFloat4ToU32(colors.text), "amyrIDE");
+    draw->AddText(ImVec2(46.0f * unit, logo_center_y - ImGui::CalcTextSize("Nimbus").y * 0.5f), ImGui::ColorConvertFloat4ToU32(colors.text), "Nimbus");
     ImGui::PopFont();
 
     if (workspace.valid)

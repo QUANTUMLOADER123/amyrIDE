@@ -101,35 +101,42 @@ namespace
         {
             const inline_run_t& run = runs[i];
             float font_size = ImGui::GetStyle().FontSizeBase * (run.heading_run ? 1.0f + 0.16f * static_cast<float>(run.heading_level) : 1.0f);
-            ImFont* font = run.bold || run.heading_run ? theme.font_bold : theme.font_main;
+            ImFont* font = run.code ? theme.font_mono : run.bold || run.heading_run ? theme.font_bold : theme.font_main;
             ImVec4 color = base_color;
             if (run.code)
-                color = ImVec4(colors.accent.x * 0.45f + colors.text.x * 0.55f, colors.accent.y * 0.45f + colors.text.y * 0.55f, colors.accent.z * 0.45f + colors.text.z * 0.55f, 1.0f);
+                color = ImVec4(colors.accent.x * 0.40f + colors.text.x * 0.60f, colors.accent.y * 0.40f + colors.text.y * 0.60f, colors.accent.z * 0.40f + colors.text.z * 0.60f, 1.0f);
 
-            std::string piece = run.text;
-            bool ends_newline = !piece.empty() && piece.back() == '\n';
-            if (ends_newline)
-                piece.pop_back();
-
-            if (run.code && !piece.empty())
+            size_t scan = 0;
+            while (scan <= run.text.size())
             {
-                ImVec2 piece_size = ImGui::CalcTextSize(piece.c_str(), nullptr, false, font_size);
-                ImVec2 draw_pos = ImGui::GetCursorScreenPos();
-                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(draw_pos.x - 3.0f * unit, draw_pos.y), ImVec2(draw_pos.x + piece_size.x + 3.0f * unit, draw_pos.y + piece_size.y), ImGui::ColorConvertFloat4ToU32(ImVec4(colors.accent.x, colors.accent.y, colors.accent.z, 0.14f)), 4.0f * unit);
+                size_t newline = run.text.find('\n', scan);
+                size_t end = newline == std::string::npos ? run.text.size() : newline;
+                std::string fragment(run.text.data() + scan, end - scan);
+                bool ends_line = newline != std::string::npos;
+                scan = ends_line ? newline + 1 : run.text.size() + 1;
+
+                if (fragment.empty())
+                    continue;
+
+                float line_start_x = ImGui::GetCursorPosX();
+                ImGui::PushFont(font, font_size);
+                ImVec2 piece_size = ImGui::CalcTextSize(fragment.c_str());
+                bool draw_pill = run.code && piece_size.x + 8.0f * unit <= wrap_width;
+                if (draw_pill)
+                {
+                    ImVec2 pill_min = ImGui::GetCursorScreenPos();
+                    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pill_min.x - 4.0f * unit, pill_min.y - 1.0f), ImVec2(pill_min.x + piece_size.x + 4.0f * unit, pill_min.y + piece_size.y + 1.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(colors.accent.x, colors.accent.y, colors.accent.z, 0.14f)), 5.0f * unit);
+                }
+                ImGui::PushStyleColor(ImGuiCol_Text, color);
+                ImGui::TextUnformatted(fragment.c_str());
+                ImGui::PopStyleColor();
+                ImGui::PopFont();
+
+                bool last = i + 1 >= runs.size();
+                bool wrapped = ImGui::GetCursorPosX() <= line_start_x + 0.5f;
+                if (!last && !ends_line && !wrapped)
+                    ImGui::SameLine(0.0f, 0.0f);
             }
-
-            ImGui::PushFont(font, font_size);
-            ImGui::PushStyleColor(ImGuiCol_Text, color);
-            if (!piece.empty())
-                ImGui::TextUnformatted(piece.c_str());
-            else
-                ImGui::Dummy(ImVec2(0.0f, 0.0f));
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-
-            bool last = i + 1 >= runs.size();
-            if (!last && !ends_newline && !piece.empty())
-                ImGui::SameLine(0.0f, 0.0f);
         }
 
         ImGui::PopTextWrapPos();
