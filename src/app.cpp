@@ -172,6 +172,11 @@ void c_ide_app::add_current_project()
     set_workspace(picked);
 }
 
+void c_ide_app::open_workspace_dialog()
+{
+    add_current_project();
+}
+
 std::string c_ide_app::chats_dir(const std::string& project_path) const
 {
     unsigned long long hash = 1469598103934665603ull;
