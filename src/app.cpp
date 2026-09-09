@@ -1,12 +1,14 @@
 #include "app.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 
 #include "core/string.hpp"
+#include "core/utf8.hpp"
 #include "platform/shell.hpp"
 
 namespace
@@ -33,7 +35,7 @@ namespace
             return "";
         std::ostringstream buffer;
         buffer << file.rdbuf();
-        return buffer.str();
+        return utf8::ensure_utf8(buffer.str());
     }
 }
 
@@ -64,7 +66,8 @@ void c_ide_app::initialize(void* hwnd)
     theme.accent_index = config.accent_index;
     if (!config.workspace_path.empty() && shell::path_exists(config.workspace_path))
         set_workspace(config.workspace_path);
-    load_session();
+    else
+        new_chat();
 
     startup_time = anim::time_now();
 }
@@ -80,11 +83,141 @@ void c_ide_app::shutdown()
 
 void c_ide_app::set_workspace(const std::string& path)
 {
+    save_session();
     workspace.set_root(std::filesystem::path(shell::to_wide(path)));
     config.workspace_path = path;
     config.save();
     on_files_changed_external();
+    scan_chats();
+    load_last_chat();
     toasts.push("проект: " + workspace.display_name(), icon_folder_open, theme.palette().accent);
+}
+
+std::vector<chat_meta_t>& c_ide_app::chats()
+{
+    return chat_list;
+}
+
+std::string c_ide_app::chats_dir() const
+{
+    unsigned long long hash = 1469598103934665603ull;
+    for (char symbol : workspace.root.string())
+    {
+        hash ^= static_cast<unsigned char>(symbol);
+        hash *= 1099511628211ull;
+    }
+    return shell::appdata_dir() + str::format("\\chats\\%016llx", hash);
+}
+
+std::string c_ide_app::chat_file(const std::string& id) const
+{
+    return chats_dir() + "\\chat_" + id + ".json";
+}
+
+void c_ide_app::scan_chats()
+{
+    chat_list.clear();
+    std::string directory = chats_dir();
+    std::error_code error;
+    if (!std::filesystem::is_directory(std::filesystem::path(shell::to_wide(directory)), error))
+        return;
+    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(std::filesystem::path(shell::to_wide(directory))))
+    {
+        std::string name = entry.path().filename().string();
+        if (!name.starts_with("chat_") || !name.ends_with(".json"))
+            continue;
+        chat_meta_t meta;
+        meta.id = name.substr(5, name.size() - 10);
+        std::ifstream file(entry.path(), std::ios::binary);
+        if (file.good())
+        {
+            std::ostringstream buffer;
+            buffer << file.rdbuf();
+            json_t state;
+            if (json_t::parse(buffer.str(), state))
+            {
+                const json_t* messages = state.find("messages");
+                if (messages && messages->is_array())
+                {
+                    for (size_t i = 0; i < messages->size(); ++i)
+                    {
+                        const json_t& message = messages->at(i);
+                        if (message["role"].as_string() == "user" && !message["internal_note"].as_bool(false))
+                        {
+                            meta.title = str::truncate_middle(str::trim(message["content"].as_string()), 46);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (meta.title.empty())
+            meta.title = "новый диалог";
+        chat_list.push_back(std::move(meta));
+    }
+    std::sort(chat_list.begin(), chat_list.end(), [](const chat_meta_t& left, const chat_meta_t& right) { return left.id > right.id; });
+}
+
+void c_ide_app::load_last_chat()
+{
+    if (chat_list.empty())
+    {
+        new_chat();
+        return;
+    }
+    std::ifstream file(std::filesystem::path(shell::to_wide(chat_file(chat_list.front().id))), std::ios::binary);
+    if (!file.good())
+    {
+        new_chat();
+        return;
+    }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    ai.restore_session(buffer.str());
+    ai.session_dirty = false;
+    active_chat_id = chat_list.front().id;
+}
+
+void c_ide_app::new_chat()
+{
+    save_session();
+    ai.clear_history();
+    ai.session_dirty = false;
+    long long stamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    active_chat_id = str::format("%llx", stamp);
+    chat_list.insert(chat_list.begin(), { active_chat_id, "новый диалог" });
+}
+
+void c_ide_app::open_chat(const std::string& id)
+{
+    if (ai.busy() || id == active_chat_id)
+        return;
+    save_session();
+    std::ifstream file(std::filesystem::path(shell::to_wide(chat_file(id))), std::ios::binary);
+    if (!file.good())
+        return;
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    ai.clear_history();
+    ai.restore_session(buffer.str());
+    ai.session_dirty = false;
+    active_chat_id = id;
+}
+
+void c_ide_app::delete_chat(const std::string& id)
+{
+    std::error_code error;
+    std::filesystem::remove(std::filesystem::path(shell::to_wide(chat_file(id))), error);
+    chat_list.erase(std::remove_if(chat_list.begin(), chat_list.end(), [&id](const chat_meta_t& meta) { return meta.id == id; }), chat_list.end());
+    if (id != active_chat_id)
+        return;
+    ai.clear_history();
+    ai.session_dirty = false;
+    active_chat_id.clear();
+    if (!chat_list.empty())
+        open_chat(chat_list.front().id);
+    else
+        new_chat();
 }
 
 void c_ide_app::open_workspace_dialog()
@@ -104,6 +237,8 @@ void c_ide_app::attach_dropped_file(const std::string& path)
 void c_ide_app::clear_conversation()
 {
     ai.clear_history();
+    ai.session_dirty = true;
+    save_session();
     toasts.push("диалог очищен", icon_trash_can, theme.palette().text_dim);
 }
 
@@ -128,20 +263,15 @@ void c_ide_app::export_conversation()
 
 void c_ide_app::save_session()
 {
-    if (!ai.session_dirty)
+    if (!ai.session_dirty || active_chat_id.empty() || !workspace.valid)
         return;
-    std::ofstream file(std::filesystem::path(shell::to_wide(config.session_path())), std::ios::binary | std::ios::trunc);
+    std::string directory = chats_dir();
+    std::error_code error;
+    std::filesystem::create_directories(std::filesystem::path(shell::to_wide(directory)), error);
+    std::ofstream file(std::filesystem::path(shell::to_wide(chat_file(active_chat_id))), std::ios::binary | std::ios::trunc);
     if (file.good())
         file << ai.serialize_session();
     ai.session_dirty = false;
-}
-
-void c_ide_app::load_session()
-{
-    std::string text = read_whole_file(config.session_path());
-    if (text.empty())
-        return;
-    ai.restore_session(text);
 }
 
 void c_ide_app::apply_code_block(const std::string& path, const std::string& code)
@@ -351,58 +481,9 @@ void c_ide_app::draw_titlebar(void* hwnd)
     draw->AddLine(ImVec2(0, bar_height - 1.0f), ImVec2(io.DisplaySize.x, bar_height - 1.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(colors.border.x, colors.border.y, colors.border.z, 0.6f)));
 
     float logo_center_y = bar_height * 0.5f;
-    ImVec2 logo_center(24.0f * unit, logo_center_y);
-    float pulse = 0.5f + 0.5f * std::sin(anim::time_now() * 1.8f);
-    draw->AddCircleFilled(logo_center, 13.0f * unit + pulse * 1.5f * unit, theme_ref.accent_u32(0.14f), 32);
-    float ray = 6.5f * unit + pulse * 0.7f * unit;
-    draw->AddLine(ImVec2(logo_center.x, logo_center.y - ray), ImVec2(logo_center.x, logo_center.y + ray), theme_ref.accent_u32(0.95f), 2.4f * unit);
-    draw->AddLine(ImVec2(logo_center.x - ray, logo_center.y), ImVec2(logo_center.x + ray, logo_center.y), theme_ref.accent_u32(0.95f), 2.4f * unit);
-    float diag = ray * 0.45f;
-    draw->AddLine(ImVec2(logo_center.x - diag, logo_center.y - diag), ImVec2(logo_center.x + diag, logo_center.y + diag), theme_ref.accent_u32(0.55f), 1.6f * unit);
-    draw->AddLine(ImVec2(logo_center.x - diag, logo_center.y + diag), ImVec2(logo_center.x + diag, logo_center.y - diag), theme_ref.accent_u32(0.55f), 1.6f * unit);
-    draw->AddCircleFilled(logo_center, 1.8f * unit, theme_ref.accent_u32(1.0f), 12);
-
     ImGui::PushFont(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 0.98f);
-    draw->AddText(ImVec2(46.0f * unit, logo_center_y - ImGui::CalcTextSize("Nimbus").y * 0.5f), ImGui::ColorConvertFloat4ToU32(colors.text), "Nimbus");
+    draw->AddText(ImVec2(24.0f * unit, logo_center_y - ImGui::CalcTextSize("Nimbus").y * 0.5f), ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.text, 0.85f)), "Nimbus");
     ImGui::PopFont();
-
-    if (workspace.valid)
-    {
-        std::string workspace_label = workspace.display_name();
-        draw->AddText(nullptr, 0.0f, ImVec2(130.0f * unit, logo_center_y - ImGui::CalcTextSize(workspace_label.c_str()).y * 0.5f), ImGui::ColorConvertFloat4ToU32(colors.text_dim), workspace_label.c_str());
-    }
-
-    float button_width = 40.0f * unit;
-    float x = io.DisplaySize.x - button_width * 3.0f;
-    bool maximized = shell::window_is_maximized(hwnd);
-
-    auto title_button = [&](float bx, const char* icon) -> bool {
-        ImVec2 button_min(bx, 0.0f);
-        ImVec2 button_max(bx + button_width, bar_height);
-        bool hovered = ImGui::IsMouseHoveringRect(button_min, button_max);
-        if (hovered)
-            draw->AddRectFilled(button_min, button_max, ImGui::ColorConvertFloat4ToU32(ImVec4(colors.text.x, colors.text.y, colors.text.z, 0.08f)));
-        ImVec2 icon_dimensions = ImGui::CalcTextSize(icon);
-        draw->AddText(nullptr, 12.5f * unit, ImVec2(bx + button_width * 0.5f - icon_dimensions.x * 0.5f, logo_center_y - icon_dimensions.y * 0.5f), ImGui::ColorConvertFloat4ToU32(hovered ? colors.text : colors.text_dim), icon);
-        return hovered && ImGui::IsMouseClicked(0);
-    };
-
-    if (title_button(x, icon_window_minimize))
-        shell::window_send_command(hwnd, 0xF020);
-    x += button_width;
-    const char* maximize_icon = maximized ? icon_window_restore : icon_window_maximize;
-    if (title_button(x, maximize_icon))
-        shell::window_send_command(hwnd, maximized ? 0xF120 : 0xF030);
-    x += button_width;
-    ImVec2 close_min(x, 0.0f);
-    ImVec2 close_max(x + button_width, bar_height);
-    bool close_hovered = ImGui::IsMouseHoveringRect(close_min, close_max);
-    if (close_hovered)
-        draw->AddRectFilled(close_min, close_max, ImGui::ColorConvertFloat4ToU32(ImVec4(0.937f, 0.267f, 0.267f, 0.85f)));
-    ImVec2 close_size = ImGui::CalcTextSize(icon_xmark);
-    draw->AddText(nullptr, 12.5f * unit, ImVec2(x + button_width * 0.5f - close_size.x * 0.5f, logo_center_y - close_size.y * 0.5f), ImGui::ColorConvertFloat4ToU32(close_hovered ? ImVec4(1, 1, 1, 1) : colors.text_dim), icon_xmark);
-    if (close_hovered && ImGui::IsMouseClicked(0))
-        shell::window_send_command(hwnd, 0xF060);
 }
 
 void c_ide_app::draw_statusbar()

@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "core/string.hpp"
+#include "core/utf8.hpp"
 #include "platform/process.hpp"
 #include "platform/shell.hpp"
 
@@ -36,7 +37,7 @@ namespace
             return false;
         std::ostringstream buffer;
         buffer << file.rdbuf();
-        out = buffer.str();
+        out = utf8::ensure_utf8(buffer.str());
         return true;
     }
 

@@ -271,29 +271,13 @@ void c_chat_panel::render_header(c_ide_app& app)
     c_theme& theme = app.theme;
     const palette_t& colors = theme.palette();
     float unit = theme.scale();
-    float row_height = ImGui::GetTextLineHeight() + 6.0f * unit;
 
-    ImVec2 logo_center(ImGui::GetCursorScreenPos().x + 12.0f * unit, ImGui::GetCursorScreenPos().y + row_height * 0.5f);
-    float pulse = 0.5f + 0.5f * std::sin(anim::time_now() * 1.8f);
-    glow_circle(ImGui::GetWindowDrawList(), logo_center, 7.0f * unit, colors.accent);
-    ImGui::GetWindowDrawList()->AddCircleFilled(logo_center, 7.0f * unit + pulse * 1.2f * unit, theme.accent_u32(0.14f), 24);
-    ImGui::GetWindowDrawList()->AddCircleFilled(logo_center, 7.0f * unit, theme.accent_u32(0.85f), 24);
-
-    ImGui::SetCursorScreenPos(ImVec2(logo_center.x + 16.0f * unit, logo_center.y - ImGui::GetTextLineHeight() * 0.5f));
     ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase);
     ImGui::TextColored(colors.text, "%s", "Nimbus");
     ImGui::PopFont();
 
-    if (app.workspace.valid)
-    {
-        ImGui::SameLine(0.0f, 10.0f * unit);
-        ImGui::TextColored(colors.text_faint, "%s", icon_folder_open);
-        ImGui::SameLine(0.0f, 5.0f * unit);
-        ImGui::TextColored(colors.text_dim, "%s", app.workspace.display_name().c_str());
-    }
-
-    ImGui::SameLine(ImGui::GetContentRegionMax().x - (4.0f * 33.0f + 152.0f) * unit);
-    ImGui::SetNextItemWidth(146.0f * unit);
+    ImGui::SameLine(ImGui::GetContentRegionMax().x - 300.0f * unit);
+    ImGui::SetNextItemWidth(212.0f * unit);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, colors.background);
     if (ImGui::BeginCombo("##model_pick", app.config.model.c_str(), ImGuiComboFlags_HeightLargest))
     {
@@ -313,21 +297,10 @@ void c_chat_panel::render_header(c_ide_app& app)
     ImGui::PopStyleColor();
 
     ImGui::SameLine(0.0f, 6.0f * unit);
-    if (icon_button(theme, icon_xmark, "##chat_clear", "очистить диалог"))
-        app.clear_conversation();
-    ImGui::SameLine(0.0f, 2.0f * unit);
-    if (icon_button(theme, icon_download, "##chat_export", "экспорт диалога"))
-        app.export_conversation();
-    ImGui::SameLine(0.0f, 2.0f * unit);
-    if (icon_button(theme, icon_folder_open, "##chat_project", "сменить проект"))
-        app.open_workspace_dialog();
-    ImGui::SameLine(0.0f, 2.0f * unit);
-    if (icon_button(theme, icon_gear, "##chat_settings", "настройки (ctrl+,)"))
-    {
-        app.settings.visible = !app.settings.visible;
-    }
+    if (icon_button(theme, icon_gear, "##chat_settings", "настройки и диалоги (ctrl+,)"))
+        app.settings.visible = true;
 
-    ImGui::Dummy(ImVec2(0.0f, 2.0f * unit));
+    ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
     float meter_width = ImGui::GetContentRegionAvail().x - 150.0f * unit;
     token_meter(theme, app.ai.total_tokens(), app.config.context_limit, meter_width);
     ImGui::SameLine(0.0f, 8.0f * unit);

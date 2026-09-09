@@ -27,6 +27,74 @@ void c_settings_panel::open()
     visible = true;
 }
 
+void c_settings_panel::render_chats(c_ide_app& app)
+{
+    c_theme& theme = app.theme;
+    const palette_t& colors = theme.palette();
+    float unit = theme.scale();
+
+    section_header(theme, "диалоги этого проекта");
+    ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
+
+    float button_height = ImGui::GetTextLineHeight() + 12.0f * unit;
+    float row_width = ImGui::GetContentRegionAvail().x;
+    float cell_width = (row_width - 24.0f * unit) / 3.0f;
+
+    if (accent_button(theme, "новый диалог", ImVec2(cell_width, button_height)))
+        app.new_chat();
+    ImGui::SameLine(0.0f, 12.0f * unit);
+    if (ghost_button(theme, "открыть проект", ImVec2(cell_width, button_height)))
+    {
+        visible = false;
+        app.open_workspace_dialog();
+    }
+    ImGui::SameLine(0.0f, 12.0f * unit);
+    if (ghost_button(theme, "экспорт чата", ImVec2(cell_width, button_height)))
+    {
+        visible = false;
+        app.export_conversation();
+    }
+
+    ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
+    std::vector<chat_meta_t>& chats = app.chats();
+    float list_height = std::min(240.0f * unit, ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(chats.size() + 1) + 12.0f * unit);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.background, 0.7f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f * unit);
+    ImGui::BeginChild("##chats_list", ImVec2(0.0f, list_height), ImGuiChildFlags_Borders);
+    for (size_t i = 0; i < chats.size(); ++i)
+    {
+        chat_meta_t& meta = chats[i];
+        bool active = meta.id == app.active_chat();
+        ImGui::PushID(meta.id.c_str());
+        std::string label = (active ? "> " : "  ") + meta.title;
+        ImVec2 row_min = ImGui::GetCursorScreenPos();
+        float row_width = ImGui::GetContentRegionAvail().x - 30.0f * unit;
+        if (ImGui::Selectable(label.c_str(), active, ImGuiSelectableFlags_None, ImVec2(row_width, 0.0f)))
+            app.open_chat(meta.id);
+        float row_height = ImGui::GetItemRectSize().y;
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::SetCursorScreenPos(ImVec2(row_min.x + row_width + 8.0f * unit, row_min.y + (row_height - ImGui::GetTextLineHeight()) * 0.5f));
+        if (icon_button(theme, icon_xmark, "##del", "удалить диалог", 0.0f, colors.text_faint))
+        {
+            app.delete_chat(meta.id);
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+    ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
+    ImGui::TextColored(colors.text_faint, "у каждого проекта свои диалоги, хранятся локально в appdata");
+    ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
+    if (ghost_button(theme, "очистить текущий диалог", ImVec2(0.0f, ImGui::GetTextLineHeight() + 10.0f * unit)))
+    {
+        app.clear_conversation();
+        visible = false;
+    }
+}
+
 void c_settings_panel::render_connection(c_ide_app& app)
 {
     c_theme& theme = app.theme;
@@ -231,6 +299,7 @@ void c_settings_panel::draw(c_ide_app& app)
     ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
     ImGui::BeginChild("##settings_scroll", ImVec2(0.0f, -30.0f * unit), ImGuiChildFlags_None);
 
+    render_chats(app);
     render_connection(app);
     render_context(app);
     render_appearance(app);

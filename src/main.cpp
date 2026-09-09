@@ -67,6 +67,15 @@ namespace
         g_swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
         create_render_target();
     }
+
+    void apply_window_rounding(HWND window)
+    {
+        RECT frame{};
+        if (!GetClientRect(window, &frame))
+            return;
+        HRGN region = CreateRoundRectRgn(0, 0, frame.right + 1, frame.bottom + 1, 22, 22);
+        SetWindowRgn(window, region, TRUE);
+    }
 }
 
 static LRESULT WINAPI window_procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
@@ -169,6 +178,7 @@ static LRESULT WINAPI window_procedure(HWND window, UINT message, WPARAM wparam,
         if (wparam == SIZE_MINIMIZED || !g_swap_chain)
             break;
         resize_swap_chain(LOWORD(lparam), HIWORD(lparam));
+        apply_window_rounding(window);
         return 0;
     }
     case WM_SYSCOMMAND:
@@ -245,6 +255,7 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command)
     create_render_target();
     ShowWindow(window, show_command);
     UpdateWindow(window);
+    apply_window_rounding(window);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

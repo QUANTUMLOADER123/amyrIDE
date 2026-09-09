@@ -13,6 +13,7 @@ public:
     bool visible = false;
 
 private:
+    void render_chats(c_ide_app& app);
     void render_connection(c_ide_app& app);
     void render_context(c_ide_app& app);
     void render_appearance(c_ide_app& app);
