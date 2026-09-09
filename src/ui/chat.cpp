@@ -542,7 +542,7 @@ void c_chat_panel::render_message(c_ide_app& app, const message_t& message, int 
         ImGui::PushID(str::format("note_%d", message_index).c_str());
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.05f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 9.0f * unit);
-        ImGui::BeginChild("##note", ImVec2(wrap_width, 0.0f), ImGuiChildFlags_AlwaysAutoResize);
+        ImGui::BeginChild("##note", ImVec2(wrap_width, 0.0f), ImGuiChildFlags_AutoResizeY);
         ImGui::PushFont(theme.font_main, ImGui::GetStyle().FontSizeBase * 0.85f);
         ImGui::TextColored(colors.text_faint, "%s", icon_compress);
         ImGui::SameLine(0.0f, 8.0f * unit);
@@ -580,7 +580,7 @@ void c_chat_panel::render_message(c_ide_app& app, const message_t& message, int 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.10f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f * unit, 9.0f * unit));
-        ImGui::BeginChild("##user_bubble", ImVec2(wrap_width - indent, 0.0f), ImGuiChildFlags_AlwaysAutoResize);
+        ImGui::BeginChild("##user_bubble", ImVec2(wrap_width - indent, 0.0f), ImGuiChildFlags_AutoResizeY);
         render_markdown(app, parse_markdown(message.content), wrap_width - indent - 28.0f * unit);
         ImGui::EndChild();
         ImGui::PopStyleVar(2);
