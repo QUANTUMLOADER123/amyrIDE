@@ -40,12 +40,6 @@ void c_settings_panel::render_chats(c_ide_app& app)
         visible = false;
         app.chats_overlay.visible = true;
     }
-    ImGui::SameLine(0.0f, 12.0f * unit);
-    if (ghost_button(theme, "новая сессия", ImVec2(0.0f, ImGui::GetTextLineHeight() + 14.0f * unit)))
-    {
-        visible = false;
-        app.new_chat();
-    }
     ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
     ImGui::TextColored(colors.text_faint, "у каждого проекта свои сессии, всё хранится локально в appdata");
 }

@@ -604,20 +604,6 @@ void c_ide_app::draw_titlebar(void* hwnd)
     ImGui::PushFont(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 0.98f);
     draw->AddText(ImVec2(24.0f * unit, logo_center_y - ImGui::CalcTextSize("Nimbus").y * 0.5f), ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.text, 0.85f)), "Nimbus");
     ImGui::PopFont();
-
-    const char* chats_label = "диалоги";
-    ImVec2 chats_size = ImGui::CalcTextSize(chats_label);
-    float button_x = 24.0f * unit + ImGui::CalcTextSize("Nimbus").x + 18.0f * unit;
-    ImVec2 button_min(button_x, (bar_height - chats_size.y - 8.0f * unit) * 0.5f);
-    ImVec2 button_max(button_x + chats_size.x + 20.0f * unit, button_min.y + chats_size.y + 8.0f * unit);
-    bool chats_hovered = ImGui::IsMouseHoveringRect(button_min, button_max);
-    if (chats_hovered)
-        draw->AddRectFilled(button_min, button_max, theme_ref.accent_u32(0.10f), 8.0f * unit);
-    draw->AddText(ImVec2(button_min.x + 10.0f * unit, logo_center_y - chats_size.y * 0.5f), ImGui::ColorConvertFloat4ToU32(chats_hovered ? colors.text : colors.text_dim), chats_label);
-    if (chats_hovered)
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-    if (chats_hovered && ImGui::IsMouseClicked(0))
-        chats_overlay.visible = !chats_overlay.visible;
 }
 
 void c_ide_app::draw_statusbar()
