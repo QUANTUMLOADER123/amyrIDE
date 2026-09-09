@@ -76,6 +76,8 @@ void c_theme::load_fonts(float dpi_scale, const char* font_directory)
     font_bold = atlas->AddFontFromFileTTF(semibold_path.c_str(), font_base, nullptr, text_glyph_ranges);
     if (!font_bold)
         font_bold = font_main;
+    if (font_bold && shell::path_exists(icons_path))
+        atlas->AddFontFromFileTTF(icons_path.c_str(), font_base * 0.80f, &icons_config, icon_glyphs);
 
     font_mono = atlas->AddFontFromFileTTF(mono_path.c_str(), font_base * 0.92f, nullptr, text_glyph_ranges);
     if (!font_mono)

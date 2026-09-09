@@ -300,16 +300,16 @@ void c_ide_app::draw_welcome()
     draw->AddText(nullptr, 30.0f * unit, ImVec2(center.x - icon_size.x * 0.5f, center.y - icon_size.y * 0.5f), theme_ref.accent_u32(0.98f), logo_icon);
 
     float y = center.y + 58.0f * unit;
-    ImGui::PushFont(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 2.2f);
     const char* title = "amyrIDE";
-    ImVec2 title_size = ImGui::CalcTextSize(title);
-    draw->AddText(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 2.2f, ImVec2(center.x - title_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(colors.text), title);
-    ImGui::PopFont();
-    y += title_size.y + 6.0f * unit;
+    float title_size_value = ImGui::GetStyle().FontSizeBase * 2.2f;
+    ImVec2 title_size = theme_ref.font_bold->CalcTextSizeA(title_size_value, 32768.0f, 0.0f, title);
+    draw->AddText(theme_ref.font_bold, title_size_value, ImVec2(center.x - title_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(colors.text), title);
+    y += title_size.y + 8.0f * unit;
 
     const char* subtitle = "ai-ассистент, который сам читает, правит и запускает твой проект";
-    ImVec2 subtitle_size = ImGui::CalcTextSize(subtitle);
-    draw->AddText(nullptr, 0.0f, ImVec2(center.x - subtitle_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(colors.text_faint), subtitle);
+    float subtitle_size_value = ImGui::GetStyle().FontSizeBase;
+    ImVec2 subtitle_size = theme_ref.font_main->CalcTextSizeA(subtitle_size_value, 32768.0f, 0.0f, subtitle);
+    draw->AddText(theme_ref.font_main, subtitle_size_value, ImVec2(center.x - subtitle_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(colors.text_faint), subtitle);
     y += subtitle_size.y + 34.0f * unit;
 
     std::string button_label = std::string(icon_folder_open) + "   Open Project";
@@ -335,8 +335,9 @@ void c_ide_app::draw_welcome()
 
     y += button_size.y + 22.0f * unit;
     const char* hint = "выбери папку проекта в проводнике — ассистент получит доступ к файлам";
-    ImVec2 hint_size = ImGui::CalcTextSize(hint);
-    draw->AddText(nullptr, 0.0f, ImVec2(center.x - hint_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.text_faint, 0.75f)), hint);
+    float hint_size_value = ImGui::GetStyle().FontSizeBase;
+    ImVec2 hint_size = theme_ref.font_main->CalcTextSizeA(hint_size_value, 32768.0f, 0.0f, hint);
+    draw->AddText(theme_ref.font_main, hint_size_value, ImVec2(center.x - hint_size.x * 0.5f, y), ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.text_faint, 0.75f)), hint);
 
     y += hint_size.y + 14.0f * unit;
     ImGui::SetCursorScreenPos(ImVec2(center.x - 90.0f * unit, y));
