@@ -581,11 +581,7 @@ void c_ide_app::draw_welcome()
 
 void c_ide_app::draw_assistant()
 {
-    float unit = theme.scale();
-    ImGui::Indent(14.0f * unit);
-    ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
     chat.render(*this);
-    ImGui::Unindent(14.0f * unit);
 }
 
 void c_ide_app::draw_titlebar(void* hwnd)
@@ -604,6 +600,69 @@ void c_ide_app::draw_titlebar(void* hwnd)
     ImGui::PushFont(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 0.98f);
     draw->AddText(ImVec2(24.0f * unit, logo_center_y - ImGui::CalcTextSize("Nimbus").y * 0.5f), ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.text, 0.85f)), "Nimbus");
     ImGui::PopFont();
+
+    if (!workspace.valid)
+        return;
+
+    float unit2 = theme_ref.scale();
+    float content_height = ImGui::GetTextLineHeight();
+    float widget_height = content_height + 10.0f * unit2;
+    float widget_top = (bar_height - widget_height) * 0.5f;
+    float widget_center = widget_top + widget_height * 0.5f;
+
+    const char* chats_label = "диалоги";
+    ImVec2 chats_size = ImGui::CalcTextSize(chats_label);
+    float chats_x = 24.0f * unit2 + ImGui::CalcTextSize("Nimbus").x + 28.0f * unit2;
+    ImVec2 chats_min(chats_x, widget_top);
+    ImVec2 chats_max(chats_x + chats_size.x + 18.0f * unit2, widget_top + widget_height);
+    bool chats_hovered = ImGui::IsMouseHoveringRect(chats_min, chats_max);
+    if (chats_hovered)
+        draw->AddRectFilled(chats_min, chats_max, theme_ref.accent_u32(0.10f), 8.0f * unit2);
+    draw->AddText(ImVec2(chats_min.x + 9.0f * unit2, widget_center - chats_size.y * 0.5f), ImGui::ColorConvertFloat4ToU32(chats_hovered ? colors.text : colors.text_dim), chats_label);
+    if (chats_hovered)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    if (ImGui::IsMouseHoveringRect(chats_min, chats_max) && ImGui::IsMouseClicked(0))
+        chats_overlay.visible = !chats_overlay.visible;
+
+    float gear_size = content_height + 8.0f * unit2;
+    float right_x = io.DisplaySize.x - 14.0f * unit2;
+    float gear_x = right_x - gear_size;
+    float ring_radius = content_height * 0.55f;
+    float ring_x = gear_x - 20.0f * unit2 - ring_radius;
+    ImVec2 ring_center(ring_x, widget_center);
+    double used = static_cast<double>(ai.total_tokens());
+    double limit = static_cast<double>(config.context_limit > 0 ? config.context_limit : 1);
+    double fraction = used / limit;
+    if (fraction < 0.0)
+        fraction = 0.0;
+    if (fraction > 1.0)
+        fraction = 1.0;
+    draw->AddCircle(ring_center, ring_radius, ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.border, 0.9f)), 28, 3.0f * unit2);
+    if (fraction > 0.003)
+    {
+        float sweep = -1.5707963f + static_cast<float>(fraction) * 6.2831853f;
+        ImVec4 ring_color = fraction > 0.92 ? colors.danger : fraction > 0.8 ? colors.warning : colors.accent;
+        draw->PathArcTo(ring_center, ring_radius, -1.5707963f, sweep, 30);
+        draw->PathStroke(ImGui::ColorConvertFloat4ToU32(ring_color), 0, 3.0f * unit2);
+    }
+    if (ImGui::IsMouseHoveringRect(ImVec2(ring_x - ring_radius - 4.0f * unit2, widget_center - ring_radius - 4.0f * unit2), ImVec2(ring_x + ring_radius + 4.0f * unit2, widget_center + ring_radius + 4.0f * unit2)))
+    {
+        ImGui::SetTooltip("контекст: %s / %s токенов\nосталось: %s\nмодель: %s", str::format_count(ai.total_tokens()).c_str(), str::format_count(config.context_limit).c_str(), str::format_count(config.context_limit - ai.total_tokens() > 0 ? config.context_limit - ai.total_tokens() : 0).c_str(), config.model.c_str());
+    }
+
+    ImVec2 gear_min(gear_x, widget_top);
+    ImVec2 gear_max(gear_x + gear_size, widget_top + widget_height);
+    bool gear_hovered = ImGui::IsMouseHoveringRect(gear_min, gear_max);
+    if (gear_hovered)
+        draw->AddRectFilled(gear_min, gear_max, theme_ref.accent_u32(0.12f), 8.0f * unit2);
+    const char* gear_icon = icon_gear;
+    ImVec2 gear_glyph = ImGui::CalcTextSize(gear_icon);
+    draw->AddText(nullptr, content_height * 0.9f, ImVec2(gear_x + (gear_size - gear_glyph.x) * 0.5f, widget_center - gear_glyph.y * 0.5f), ImGui::ColorConvertFloat4ToU32(gear_hovered ? colors.text : colors.text_dim), gear_icon);
+    if (gear_hovered)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    if (gear_hovered && ImGui::IsMouseClicked(0))
+        settings.visible = !settings.visible;
 }
 
 void c_ide_app::draw_statusbar()

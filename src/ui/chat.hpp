@@ -30,7 +30,6 @@ public:
     void draft_message(const std::string& text);
 
 private:
-    void render_header(c_ide_app& app);
     void render_history(c_ide_app& app);
     void render_plan_strip(c_ide_app& app);
     void render_composer(c_ide_app& app);

@@ -263,70 +263,9 @@ void c_chat_panel::render(c_ide_app& app)
     if (editing_index >= 0)
         below_height += line_height + 14.0f * unit;
 
-    render_header(app);
     render_history(app);
     render_plan_strip(app);
     render_composer(app);
-}
-
-void c_chat_panel::render_header(c_ide_app& app)
-{
-    c_theme& theme = app.theme;
-    const palette_t& colors = theme.palette();
-    float unit = theme.scale();
-    float control_height = ImGui::GetTextLineHeight() + 10.0f * unit;
-    float row_top = ImGui::GetCursorScreenPos().y;
-    float row_center = row_top + control_height * 0.5f;
-    ImDrawList* draw = ImGui::GetWindowDrawList();
-    float right = ImGui::GetContentRegionMax().x;
-    float left = ImGui::GetCursorScreenPos().x;
-
-    const char* chats_label = "диалоги";
-    ImVec2 chats_size = ImGui::CalcTextSize(chats_label);
-    ImVec2 chats_min = ImGui::GetCursorScreenPos();
-    ImVec2 chats_max(chats_min.x + chats_size.x + 16.0f * unit, row_top + control_height);
-    bool chats_hovered = ImGui::IsMouseHoveringRect(chats_min, chats_max);
-    if (chats_hovered)
-        draw->AddRectFilled(chats_min, chats_max, theme.accent_u32(0.10f), 8.0f * unit);
-    draw->AddText(ImVec2(chats_min.x + 8.0f * unit, row_center - chats_size.y * 0.5f), ImGui::ColorConvertFloat4ToU32(chats_hovered ? colors.text : colors.text_dim), chats_label);
-    if (chats_hovered)
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-    ImGui::InvisibleButton("##chats_button", ImVec2(chats_max.x - chats_min.x, control_height));
-    if (ImGui::IsItemClicked())
-        app.chats_overlay.visible = true;
-
-    float gear_size = ImGui::GetTextLineHeight() + 8.0f * unit;
-    float gear_x = right - gear_size;
-    float ring_radius = ImGui::GetTextLineHeight() * 0.55f;
-    float ring_x = right - gear_size - 22.0f * unit - ring_radius;
-    ImVec2 ring_center(ring_x, row_center);
-    double used = static_cast<double>(app.ai.total_tokens());
-    double limit = static_cast<double>(std::max(app.config.context_limit, 1));
-    double fraction = std::clamp(used / limit, 0.0, 1.0);
-    draw->AddCircle(ring_center, ring_radius, ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.border, 0.9f)), 28, 3.0f * unit);
-    if (fraction > 0.003)
-    {
-        float sweep = -1.5707963f + static_cast<float>(fraction) * 6.2831853f;
-        ImVec4 ring_color = fraction > 0.92 ? colors.danger : fraction > 0.8 ? colors.warning : colors.accent;
-        draw->PathArcTo(ring_center, ring_radius, -1.5707963f, sweep, 30);
-        draw->PathStroke(ImGui::ColorConvertFloat4ToU32(ring_color), 0, 3.0f * unit);
-    }
-    ImGui::SetCursorScreenPos(ImVec2(ring_x - ring_radius - 3.0f * unit, row_top));
-    ImGui::InvisibleButton("##context_ring", ImVec2(ring_radius * 2.0f + 6.0f * unit, control_height));
-    if (ImGui::IsItemHovered())
-    {
-        ImGui::SetTooltip("контекст: %s / %s токенов\nосталось: %s\nмодель: %s", str::format_count(app.ai.total_tokens()).c_str(), str::format_count(app.config.context_limit).c_str(), str::format_count(std::max(app.config.context_limit - app.ai.total_tokens(), 0)).c_str(), app.config.model.c_str());
-    }
-
-    ImGui::SetCursorScreenPos(ImVec2(gear_x, row_top));
-    if (icon_button(theme, icon_gear, "##chat_settings", "настройки (ctrl+,)", gear_size))
-        app.settings.visible = true;
-
-    ImGui::SetCursorScreenPos(ImVec2(left, row_top + control_height + 4.0f * unit));
-    ImVec2 line_min = ImGui::GetCursorScreenPos();
-    ImGui::GetWindowDrawList()->AddRectFilled(line_min, ImVec2(line_min.x + ImGui::GetContentRegionAvail().x, line_min.y + 1.0f), ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.border, 0.55f)));
-    ImGui::Dummy(ImVec2(0.0f, 1.0f));
-    ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
 }
 
 void c_chat_panel::render_history(c_ide_app& app)
@@ -336,8 +275,7 @@ void c_chat_panel::render_history(c_ide_app& app)
     std::vector<message_t> history = app.ai.history_snapshot();
     active_tool_t running_tool = app.ai.active_tool_snapshot();
 
-    float available = ImGui::GetContentRegionAvail().y;
-    ImGui::BeginChild("##history", ImVec2(0.0f, available - below_height), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    ImGui::BeginChild("##history", ImVec2(0.0f, -below_height), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
     if (history.empty())
     {
