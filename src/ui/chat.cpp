@@ -6,6 +6,7 @@
 #include <filesystem>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <misc/cpp/imgui_stdlib.h>
 
 #include "app.hpp"
@@ -17,7 +18,7 @@
 
 namespace
 {
-    constexpr int composer_rows = 5;
+    constexpr int composer_rows = 3;
     constexpr float reveal_bytes_per_second = 850.0f;
     constexpr float reveal_catchup_bytes = 1100.0f;
     constexpr float card_appear_seconds = 0.30f;
@@ -259,6 +260,8 @@ void c_chat_panel::render(c_ide_app& app)
             plan_height += line_height * static_cast<float>(plan.size()) + 24.0f * unit + 4.0f * unit;
     }
     below_height = composer_height + hint_height + plan_height;
+    if (editing_index >= 0)
+        below_height += line_height + 14.0f * unit;
 
     render_header(app);
     render_history(app);
@@ -276,41 +279,40 @@ void c_chat_panel::render_header(c_ide_app& app)
     ImGui::TextColored(colors.text, "%s", "Nimbus");
     ImGui::PopFont();
 
-    ImGui::SameLine(ImGui::GetContentRegionMax().x - 300.0f * unit);
-    ImGui::SetNextItemWidth(212.0f * unit);
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, colors.background);
-    if (ImGui::BeginCombo("##model_pick", app.config.model.c_str(), ImGuiComboFlags_HeightLargest))
-    {
-        for (int i = 0; i < model_list_size; ++i)
-        {
-            bool selected = app.config.model == model_list[i];
-            if (ImGui::Selectable(model_list[i], selected))
-            {
-                app.config.model = model_list[i];
-                app.config.save();
-            }
-            if (selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::PopStyleColor();
-
-    ImGui::SameLine(0.0f, 6.0f * unit);
-    if (icon_button(theme, icon_gear, "##chat_settings", "настройки и диалоги (ctrl+,)"))
+    float control_height = ImGui::GetTextLineHeight() + 10.0f * unit;
+    float gear_size = ImGui::GetTextLineHeight() + 8.0f * unit;
+    float right = ImGui::GetContentRegionMax().x;
+    ImGui::SameLine(right - gear_size);
+    if (icon_button(theme, icon_gear, "##chat_settings", "настройки (ctrl+,)"))
         app.settings.visible = true;
 
-    ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
-    float meter_width = ImGui::GetContentRegionAvail().x - 150.0f * unit;
-    token_meter(theme, app.ai.total_tokens(), app.config.context_limit, meter_width);
-    ImGui::SameLine(0.0f, 8.0f * unit);
-    ImGui::TextColored(colors.text_faint, "контекст");
-    if (app.ai.total_tokens() > app.config.context_limit - app.config.response_reserve)
+    float ring_radius = ImGui::GetTextLineHeight() * 0.52f;
+    float ring_x = right - gear_size - 26.0f * unit - ring_radius;
+    float row_center = ImGui::GetCursorScreenPos().y + control_height * 0.5f;
+    ImVec2 ring_center(ring_x, row_center);
+    double used = static_cast<double>(app.ai.total_tokens());
+    double limit = static_cast<double>(std::max(app.config.context_limit, 1));
+    double fraction = std::clamp(used / limit, 0.0, 1.0);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddCircle(ring_center, ring_radius, ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.border, 0.9f)), 28, 3.0f * unit);
+    if (fraction > 0.003)
     {
-        ImGui::SameLine(0.0f, 6.0f * unit);
-        if (ghost_button(theme, "сжать", ImVec2(0.0f, ImGui::GetTextLineHeight() + 6.0f * unit)))
-            app.ai.request_compaction();
+        float sweep = -1.5707963f + static_cast<float>(fraction) * 6.2831853f;
+        ImVec4 ring_color = fraction > 0.92 ? colors.danger : fraction > 0.8 ? colors.warning : colors.accent;
+        draw->PathArcTo(ring_center, ring_radius, -1.5707963f, sweep, 30);
+        draw->PathStroke(ImGui::ColorConvertFloat4ToU32(ring_color), 0, 3.0f * unit);
     }
+    ImVec2 ring_min(ring_x - ring_radius - 4.0f * unit, row_center - ring_radius - 4.0f * unit);
+    ImVec2 ring_max(ring_x + ring_radius + 4.0f * unit, row_center + ring_radius + 4.0f * unit);
+    ImGui::InvisibleButton("##context_ring", ImVec2(ring_max.x - ring_min.x, control_height));
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::SetTooltip("контекст: %s / %s токенов\nосталось: %s\nмодель: %s", str::format_count(app.ai.total_tokens()).c_str(), str::format_count(app.config.context_limit).c_str(), str::format_count(std::max(app.config.context_limit - app.ai.total_tokens(), 0)).c_str(), app.config.model.c_str());
+    }
+
+    ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
+    float meter_width = ImGui::GetContentRegionAvail().x;
+    token_meter(theme, app.ai.total_tokens(), app.config.context_limit, meter_width);
 
     ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
     ImVec2 line_min = ImGui::GetCursorScreenPos();
@@ -543,6 +545,18 @@ void c_chat_panel::render_message(c_ide_app& app, const message_t& message, int 
         ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.82f);
         ImGui::TextColored(colors.text_faint, "%s", "ты");
         ImGui::PopFont();
+        if (!app.ai.busy())
+        {
+            ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 24.0f * unit);
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.75f);
+            if (icon_button(theme, icon_pen, "##edit_msg", "редактировать и переотправить", 0.0f))
+            {
+                input = message.content;
+                editing_index = message_index;
+                input_focus_requested = true;
+            }
+            ImGui::PopStyleVar();
+        }
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.10f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
@@ -779,9 +793,18 @@ void c_chat_panel::render_composer(c_ide_app& app)
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor();
 
+    if (editing_index >= 0)
+    {
+        ImGui::PushID("editing_chip");
+        if (chip(theme, str::format("%s редактирование сообщения — отправка перепишет диалог с этого места (клик — отмена)", icon_pen).c_str(), true))
+            editing_index = -1;
+        ImGui::PopID();
+        ImGui::Dummy(ImVec2(0.0f, 2.0f * unit));
+    }
+
     float button_size = ImGui::GetTextLineHeight() + 12.0f * unit;
     float inner_height = composer_height - 20.0f * unit;
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - button_size - 12.0f * unit);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - button_size * 2.0f - 24.0f * unit);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
     bool submitted = ImGui::InputTextMultiline("##chat_input", &input, ImVec2(0.0f, inner_height), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::PopStyleColor();
@@ -799,6 +822,13 @@ void c_chat_panel::render_composer(c_ide_app& app)
 
     ImGui::SameLine(0.0f, 12.0f * unit);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + inner_height - button_size);
+    if (icon_button(theme, icon_plus, "##chat_attach", "прикрепить файлы", button_size))
+    {
+        for (const std::string& picked : shell::pick_files())
+            attach_context_file(picked);
+    }
+
+    ImGui::SameLine(0.0f, 12.0f * unit);
     if (busy)
     {
         if (icon_button(theme, icon_stop, "##chat_stop", "остановить", button_size, colors.danger))
@@ -815,15 +845,21 @@ void c_chat_panel::render_composer(c_ide_app& app)
         if ((clicked && can_send) || (enter_pressed && can_send))
         {
             std::string message_text = str::trim(input);
+            if (editing_index >= 0)
+            {
+                app.ai.truncate_from(editing_index);
+                editing_index = -1;
+            }
             std::string context_block = build_context_block(app);
             input.clear();
             attached_files.clear();
             autoscroll = true;
+            ImGui::ClearActiveID();
             app.send_chat_message(message_text, context_block);
         }
     }
 
     ImGui::EndChild();
     ImGui::Dummy(ImVec2(0.0f, 2.0f * unit));
-    ImGui::TextColored(colors.text_faint, "enter — отправить · shift+enter — новая строка · перетащи файл сюда, чтобы приложить его");
+    ImGui::TextColored(colors.text_faint, "enter — отправить · shift+enter — новая строка · [+] прикрепить файлы или перетащи их в окно");
 }

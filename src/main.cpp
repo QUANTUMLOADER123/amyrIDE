@@ -161,11 +161,14 @@ static LRESULT WINAPI window_procedure(HWND window, UINT message, WPARAM wparam,
     case WM_DROPFILES:
     {
         HDROP drop = reinterpret_cast<HDROP>(wparam);
-        wchar_t path[MAX_PATH]{};
-        if (DragQueryFileW(drop, 0, path, MAX_PATH) > 0 && g_app)
+        unsigned int dropped_count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+        for (unsigned int index = 0; index < dropped_count && g_app; ++index)
         {
+            wchar_t path[MAX_PATH]{};
+            if (DragQueryFileW(drop, index, path, MAX_PATH) == 0)
+                continue;
             std::filesystem::path dropped(path);
-            if (std::filesystem::is_directory(dropped))
+            if (index == 0 && std::filesystem::is_directory(dropped))
                 g_app->set_workspace(shell::to_utf8(dropped.wstring()));
             else
                 g_app->attach_dropped_file(shell::to_utf8(dropped.wstring()));

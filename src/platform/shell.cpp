@@ -2,12 +2,14 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <commdlg.h>
 #include <shlobj.h>
 
 #include <filesystem>
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "comdlg32.lib")
 
 namespace shell
 {
@@ -58,7 +60,38 @@ namespace shell
         return success;
     }
 
-    std::string appdata_dir()
+    std::vector<std::string> pick_files()
+{
+    std::vector<wchar_t> buffer(32768, 0);
+    OPENFILENAMEW dialog{};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = nullptr;
+    dialog.lpstrFilter = L"All files (*.*)\0*.*\0";
+    dialog.lpstrFile = buffer.data();
+    dialog.nMaxFile = static_cast<DWORD>(buffer.size());
+    dialog.Flags = OFN_ALLOWMULTISELECT | OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+    std::vector<std::string> picked;
+    if (!GetOpenFileNameW(&dialog))
+        return picked;
+    wchar_t* cursor = buffer.data();
+    std::wstring directory = cursor;
+    cursor += directory.size() + 1;
+    if (*cursor == L'\0')
+    {
+        if (!directory.empty())
+            picked.push_back(to_utf8(directory));
+        return picked;
+    }
+    while (*cursor)
+    {
+        std::wstring name = cursor;
+        picked.push_back(to_utf8(directory + L"\\" + name));
+        cursor += name.size() + 1;
+    }
+    return picked;
+}
+
+std::string appdata_dir()
     {
         PWSTR known_path = nullptr;
         if (FAILED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &known_path)))

@@ -53,6 +53,9 @@
     <ClCompile Include="src\ui\chat.cpp">
       <Filter>ui</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\chats.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
     <ClCompile Include="src\ui\highlight.cpp">
       <Filter>ui</Filter>
     </ClCompile>
@@ -129,6 +132,9 @@
       <Filter>platform</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\chat.hpp">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\chats.hpp">
       <Filter>ui</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\highlight.hpp">

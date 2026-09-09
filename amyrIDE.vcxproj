@@ -104,6 +104,7 @@
     <ClCompile Include="src\platform\process.cpp" />
     <ClCompile Include="src\platform\shell.cpp" />
     <ClCompile Include="src\ui\chat.cpp" />
+    <ClCompile Include="src\ui\chats.cpp" />
     <ClCompile Include="src\ui\highlight.cpp" />
     <ClCompile Include="src\ui\markdown.cpp" />
     <ClCompile Include="src\ui\settings.cpp" />
@@ -132,6 +133,7 @@
     <ClInclude Include="src\platform\process.hpp" />
     <ClInclude Include="src\platform\shell.hpp" />
     <ClInclude Include="src\ui\chat.hpp" />
+    <ClInclude Include="src\ui\chats.hpp" />
     <ClInclude Include="src\ui\highlight.hpp" />
     <ClInclude Include="src\ui\fonts.hpp" />
     <ClInclude Include="src\ui\icons.hpp" />

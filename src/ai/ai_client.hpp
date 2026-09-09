@@ -56,6 +56,7 @@ public:
     void request_compaction();
     void cancel();
     void clear_history();
+    void truncate_from(int message_index);
     void reset_error();
     void shutdown();
 

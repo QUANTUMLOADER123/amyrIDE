@@ -96,6 +96,18 @@ void c_ai_client::reset_error()
     }
 }
 
+void c_ai_client::truncate_from(int message_index)
+{
+    std::lock_guard<std::mutex> guard(history_mutex);
+    if (message_index < 0 || message_index >= static_cast<int>(history.size()))
+        return;
+    history.erase(history.begin() + static_cast<long>(message_index), history.end());
+    recompute_tokens();
+    session_dirty = true;
+    error_message.clear();
+    state = ai_state::idle;
+}
+
 void c_ai_client::clear_history()
 {
     if (busy())

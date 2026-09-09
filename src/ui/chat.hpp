@@ -42,6 +42,7 @@ private:
     float below_height = 0.0f;
     bool input_focus_requested = false;
     bool autoscroll = true;
+    int editing_index = -1;
     bool plan_open = false;
     float last_stream_size = 0.0f;
     std::vector<std::string> attached_files;

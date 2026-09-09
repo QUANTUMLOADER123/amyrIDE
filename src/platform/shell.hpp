@@ -1,11 +1,13 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <string_view>
 
 namespace shell
 {
     bool pick_folder(std::string& out_utf8);
+    std::vector<std::string> pick_files();
     std::string appdata_dir();
     std::string executable_dir();
     std::wstring to_wide(std::string_view text);

@@ -119,15 +119,37 @@ namespace
                     continue;
 
                 ImGui::PushFont(font, font_size);
-                ImVec2 piece_size = ImGui::CalcTextSize(fragment.c_str());
-                bool draw_pill = run.code && piece_size.x + 10.0f * unit <= wrap_width;
+                std::string flow = fragment;
+                if (ImGui::CalcTextSize(flow.c_str()).x > wrap_width)
+                {
+                    std::string wrapped;
+                    float used = 0.0f;
+                    size_t walk = 0;
+                    while (walk < flow.size())
+                    {
+                        size_t next = utf8::next_position(flow, walk);
+                        std::string symbol = flow.substr(walk, next - walk);
+                        float width = ImGui::CalcTextSize(symbol.c_str()).x;
+                        if (used + width > wrap_width)
+                        {
+                            wrapped += '\n';
+                            used = 0.0f;
+                        }
+                        wrapped += symbol;
+                        used += width;
+                        walk = next;
+                    }
+                    flow = wrapped;
+                }
+                ImVec2 piece_size = ImGui::CalcTextSize(flow.c_str());
+                bool draw_pill = run.code && flow.find('\n') == std::string::npos && piece_size.x + 10.0f * unit <= wrap_width;
                 if (draw_pill)
                 {
                     ImVec2 pill_min = ImGui::GetCursorScreenPos();
                     ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pill_min.x - 5.0f * unit, pill_min.y - 1.0f), ImVec2(pill_min.x + piece_size.x + 5.0f * unit, pill_min.y + piece_size.y + 1.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(colors.accent.x, colors.accent.y, colors.accent.z, 0.14f)), 6.0f * unit);
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, color);
-                ImGui::TextUnformatted(fragment.c_str());
+                ImGui::TextUnformatted(flow.c_str());
                 ImGui::PopStyleColor();
                 ImGui::PopFont();
 

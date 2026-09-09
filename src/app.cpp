@@ -67,7 +67,10 @@ void c_ide_app::initialize(void* hwnd)
     if (!config.workspace_path.empty() && shell::path_exists(config.workspace_path))
         set_workspace(config.workspace_path);
     else
+    {
+        refresh_projects();
         new_chat();
+    }
 
     startup_time = anim::time_now();
 }
@@ -88,9 +91,16 @@ void c_ide_app::set_workspace(const std::string& path)
     config.workspace_path = path;
     config.save();
     on_files_changed_external();
+    refresh_projects();
+    save_projects_index();
     scan_chats();
     load_last_chat();
     toasts.push("проект: " + workspace.display_name(), icon_folder_open, theme.palette().accent);
+}
+
+std::vector<project_info_t>& c_ide_app::projects()
+{
+    return project_list;
 }
 
 std::vector<chat_meta_t>& c_ide_app::chats()
@@ -98,10 +108,74 @@ std::vector<chat_meta_t>& c_ide_app::chats()
     return chat_list;
 }
 
-std::string c_ide_app::chats_dir() const
+std::string c_ide_app::projects_index_path() const
+{
+    return shell::appdata_dir() + "\\projects.json";
+}
+
+void c_ide_app::refresh_projects()
+{
+    project_list.clear();
+    std::string text = read_whole_file(projects_index_path());
+    json_t index;
+    if (json_t::parse(text, index) && index.is_array())
+    {
+        for (size_t i = 0; i < index.size(); ++i)
+        {
+            const json_t& entry = index.at(i);
+            std::string path = entry["path"].as_string("");
+            if (path.empty() || !shell::path_exists(path))
+                continue;
+            project_info_t project;
+            project.path = path;
+            project.name = entry["name"].as_string("");
+            if (project.name.empty())
+                project.name = std::filesystem::path(shell::to_wide(path)).filename().string();
+            project_list.push_back(std::move(project));
+        }
+    }
+    if (workspace.valid)
+    {
+        std::string current = workspace.root.string();
+        bool known = false;
+        for (const project_info_t& project : project_list)
+        {
+            if (project.path == current)
+                known = true;
+        }
+        if (!known)
+        {
+            project_info_t project;
+            project.path = current;
+            project.name = workspace.display_name();
+            project_list.insert(project_list.begin(), std::move(project));
+            save_projects_index();
+        }
+    }
+}
+
+void c_ide_app::save_projects_index()
+{
+    json_t index = json_t::array();
+    for (const project_info_t& project : project_list)
+        index.push(json_t::object_t{ { "path", project.path }, { "name", project.name } });
+    std::ofstream file(std::filesystem::path(shell::to_wide(projects_index_path())), std::ios::binary | std::ios::trunc);
+    if (file.good())
+        file << index.dump(true);
+}
+
+void c_ide_app::add_current_project()
+{
+    std::string picked;
+    if (!shell::pick_folder(picked))
+        return;
+    set_workspace(picked);
+}
+
+std::string c_ide_app::chats_dir(const std::string& project_path) const
 {
     unsigned long long hash = 1469598103934665603ull;
-    for (char symbol : workspace.root.string())
+    for (char symbol : project_path)
     {
         hash ^= static_cast<unsigned char>(symbol);
         hash *= 1099511628211ull;
@@ -109,73 +183,84 @@ std::string c_ide_app::chats_dir() const
     return shell::appdata_dir() + str::format("\\chats\\%016llx", hash);
 }
 
-std::string c_ide_app::chat_file(const std::string& id) const
+std::string c_ide_app::chat_file(const chat_meta_t& meta) const
 {
-    return chats_dir() + "\\chat_" + id + ".json";
+    return chats_dir(meta.project_path) + "\\chat_" + meta.id + ".json";
+}
+
+std::string c_ide_app::chat_title_from(const std::string& messages_json) const
+{
+    json_t state;
+    if (json_t::parse(messages_json, state))
+    {
+        const json_t* messages = state.find("messages");
+        if (messages && messages->is_array())
+        {
+            for (size_t i = 0; i < messages->size(); ++i)
+            {
+                const json_t& message = messages->at(i);
+                if (message["role"].as_string() == "user" && !message["internal_note"].as_bool(false))
+                    return str::truncate_middle(str::trim(message["content"].as_string()), 46);
+            }
+        }
+    }
+    return "";
 }
 
 void c_ide_app::scan_chats()
 {
     chat_list.clear();
-    std::string directory = chats_dir();
-    std::error_code error;
-    if (!std::filesystem::is_directory(std::filesystem::path(shell::to_wide(directory)), error))
-        return;
-    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(std::filesystem::path(shell::to_wide(directory))))
+    std::string active_path = workspace.valid ? workspace.root.string() : "";
+    for (const project_info_t& project : project_list)
     {
-        std::string name = entry.path().filename().string();
-        if (!name.starts_with("chat_") || !name.ends_with(".json"))
+        std::string directory = chats_dir(project.path);
+        std::error_code error;
+        if (!std::filesystem::is_directory(std::filesystem::path(shell::to_wide(directory)), error))
             continue;
-        chat_meta_t meta;
-        meta.id = name.substr(5, name.size() - 10);
-        std::ifstream file(entry.path(), std::ios::binary);
-        if (file.good())
+        for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(std::filesystem::path(shell::to_wide(directory))))
         {
+            std::string name = entry.path().filename().string();
+            if (!name.starts_with("chat_") || !name.ends_with(".json"))
+                continue;
+            std::ifstream file(entry.path(), std::ios::binary);
+            if (!file.good())
+                continue;
             std::ostringstream buffer;
             buffer << file.rdbuf();
             json_t state;
-            if (json_t::parse(buffer.str(), state))
-            {
-                const json_t* messages = state.find("messages");
-                if (messages && messages->is_array())
-                {
-                    for (size_t i = 0; i < messages->size(); ++i)
-                    {
-                        const json_t& message = messages->at(i);
-                        if (message["role"].as_string() == "user" && !message["internal_note"].as_bool(false))
-                        {
-                            meta.title = str::truncate_middle(str::trim(message["content"].as_string()), 46);
-                            break;
-                        }
-                    }
-                }
-            }
+            if (!json_t::parse(buffer.str(), state))
+                continue;
+            chat_meta_t meta;
+            meta.project_path = project.path;
+            meta.project_name = project.name;
+            meta.id = name.substr(5, name.size() - 10);
+            meta.title = state["title"].as_string("");
+            meta.updated = static_cast<long long>(state["updated"].as_int64(0));
+            if (meta.title.empty())
+                meta.title = chat_title_from(buffer.str());
+            if (meta.title.empty())
+                meta.title = "новый диалог";
+            meta.active = project.path == active_path && meta.id == active_chat_id;
+            chat_list.push_back(std::move(meta));
         }
-        if (meta.title.empty())
-            meta.title = "новый диалог";
-        chat_list.push_back(std::move(meta));
     }
-    std::sort(chat_list.begin(), chat_list.end(), [](const chat_meta_t& left, const chat_meta_t& right) { return left.id > right.id; });
+    std::sort(chat_list.begin(), chat_list.end(), [](const chat_meta_t& left, const chat_meta_t& right) {
+        if (left.updated != right.updated)
+            return left.updated > right.updated;
+        return left.id > right.id;
+    });
 }
 
 void c_ide_app::load_last_chat()
 {
-    if (chat_list.empty())
+    for (const chat_meta_t& meta : chat_list)
     {
-        new_chat();
+        if (meta.project_path != workspace.root.string())
+            continue;
+        open_chat(meta);
         return;
     }
-    std::ifstream file(std::filesystem::path(shell::to_wide(chat_file(chat_list.front().id))), std::ios::binary);
-    if (!file.good())
-    {
-        new_chat();
-        return;
-    }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    ai.restore_session(buffer.str());
-    ai.session_dirty = false;
-    active_chat_id = chat_list.front().id;
+    new_chat();
 }
 
 void c_ide_app::new_chat()
@@ -185,15 +270,20 @@ void c_ide_app::new_chat()
     ai.session_dirty = false;
     long long stamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     active_chat_id = str::format("%llx", stamp);
-    chat_list.insert(chat_list.begin(), { active_chat_id, "новый диалог" });
+    if (workspace.valid)
+        scan_chats();
 }
 
-void c_ide_app::open_chat(const std::string& id)
+void c_ide_app::open_chat(const chat_meta_t& meta)
 {
-    if (ai.busy() || id == active_chat_id)
+    if (ai.busy())
+        return;
+    if (workspace.valid && meta.project_path == workspace.root.string() && meta.id == active_chat_id)
         return;
     save_session();
-    std::ifstream file(std::filesystem::path(shell::to_wide(chat_file(id))), std::ios::binary);
+    if (!workspace.valid || meta.project_path != workspace.root.string())
+        set_workspace(meta.project_path);
+    std::ifstream file(std::filesystem::path(shell::to_wide(chat_file(meta))), std::ios::binary);
     if (!file.good())
         return;
     std::ostringstream buffer;
@@ -201,31 +291,36 @@ void c_ide_app::open_chat(const std::string& id)
     ai.clear_history();
     ai.restore_session(buffer.str());
     ai.session_dirty = false;
-    active_chat_id = id;
+    active_chat_id = meta.id;
 }
 
 void c_ide_app::delete_chat(const std::string& id)
 {
-    std::error_code error;
-    std::filesystem::remove(std::filesystem::path(shell::to_wide(chat_file(id))), error);
-    chat_list.erase(std::remove_if(chat_list.begin(), chat_list.end(), [&id](const chat_meta_t& meta) { return meta.id == id; }), chat_list.end());
-    if (id != active_chat_id)
-        return;
+    for (size_t i = 0; i < chat_list.size(); ++i)
+    {
+        if (chat_list[i].id != id)
+            continue;
+        std::error_code error;
+        std::filesystem::remove(std::filesystem::path(shell::to_wide(chat_file(chat_list[i]))), error);
+        bool was_active = chat_list[i].active;
+        chat_list.erase(chat_list.begin() + static_cast<long>(i));
+        if (!was_active)
+            return;
+        break;
+    }
+    save_session();
     ai.clear_history();
     ai.session_dirty = false;
     active_chat_id.clear();
-    if (!chat_list.empty())
-        open_chat(chat_list.front().id);
-    else
-        new_chat();
-}
-
-void c_ide_app::open_workspace_dialog()
-{
-    std::string picked;
-    if (!shell::pick_folder(picked))
-        return;
-    set_workspace(picked);
+    for (const chat_meta_t& meta : chat_list)
+    {
+        if (workspace.valid && meta.project_path == workspace.root.string())
+        {
+            open_chat(meta);
+            return;
+        }
+    }
+    new_chat();
 }
 
 void c_ide_app::attach_dropped_file(const std::string& path)
@@ -265,12 +360,31 @@ void c_ide_app::save_session()
 {
     if (!ai.session_dirty || active_chat_id.empty() || !workspace.valid)
         return;
-    std::string directory = chats_dir();
+    std::string messages = ai.serialize_session();
+    chat_meta_t meta;
+    meta.project_path = workspace.root.string();
+    meta.project_name = workspace.display_name();
+    meta.id = active_chat_id;
+    meta.title = chat_title_from(messages);
+    if (meta.title.empty())
+        meta.title = "новый диалог";
+    meta.updated = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    json_t state = json_t::object_t{
+        { "id", meta.id },
+        { "title", meta.title },
+        { "updated", meta.updated }
+    };
+    json_t parsed;
+    if (json_t::parse(messages, parsed) && parsed.find("messages"))
+        state["messages"] = parsed["messages"];
+    if (parsed.find("summary"))
+        state["summary"] = parsed["summary"];
+    std::string directory = chats_dir(meta.project_path);
     std::error_code error;
     std::filesystem::create_directories(std::filesystem::path(shell::to_wide(directory)), error);
-    std::ofstream file(std::filesystem::path(shell::to_wide(chat_file(active_chat_id))), std::ios::binary | std::ios::trunc);
+    std::ofstream file(std::filesystem::path(shell::to_wide(chat_file(meta))), std::ios::binary | std::ios::trunc);
     if (file.good())
-        file << ai.serialize_session();
+        file << state.dump(true);
     ai.session_dirty = false;
 }
 
@@ -358,6 +472,7 @@ void c_ide_app::update()
         draw_assistant();
 
     settings.draw(*this);
+    chats_overlay.draw(*this);
     toasts.draw(theme);
     ImGui::End();
 
@@ -484,6 +599,20 @@ void c_ide_app::draw_titlebar(void* hwnd)
     ImGui::PushFont(theme_ref.font_bold, ImGui::GetStyle().FontSizeBase * 0.98f);
     draw->AddText(ImVec2(24.0f * unit, logo_center_y - ImGui::CalcTextSize("Nimbus").y * 0.5f), ImGui::ColorConvertFloat4ToU32(theme_ref.with_alpha(colors.text, 0.85f)), "Nimbus");
     ImGui::PopFont();
+
+    const char* chats_label = "диалоги";
+    ImVec2 chats_size = ImGui::CalcTextSize(chats_label);
+    float button_x = 24.0f * unit + ImGui::CalcTextSize("Nimbus").x + 18.0f * unit;
+    ImVec2 button_min(button_x, (bar_height - chats_size.y - 8.0f * unit) * 0.5f);
+    ImVec2 button_max(button_x + chats_size.x + 20.0f * unit, button_min.y + chats_size.y + 8.0f * unit);
+    bool chats_hovered = ImGui::IsMouseHoveringRect(button_min, button_max);
+    if (chats_hovered)
+        draw->AddRectFilled(button_min, button_max, theme_ref.accent_u32(0.10f), 8.0f * unit);
+    draw->AddText(ImVec2(button_min.x + 10.0f * unit, logo_center_y - chats_size.y * 0.5f), ImGui::ColorConvertFloat4ToU32(chats_hovered ? colors.text : colors.text_dim), chats_label);
+    if (chats_hovered)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    if (chats_hovered && ImGui::IsMouseClicked(0))
+        chats_overlay.visible = !chats_overlay.visible;
 }
 
 void c_ide_app::draw_statusbar()
