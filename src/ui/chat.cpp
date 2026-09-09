@@ -18,8 +18,8 @@
 namespace
 {
     constexpr int composer_rows = 5;
-    constexpr float reveal_bytes_per_second = 3200.0f;
-    constexpr float reveal_catchup_bytes = 2400.0f;
+    constexpr float reveal_bytes_per_second = 850.0f;
+    constexpr float reveal_catchup_bytes = 1100.0f;
     constexpr float card_appear_seconds = 0.30f;
 
     const char* tool_icon(const std::string& name)
@@ -596,14 +596,24 @@ void c_chat_panel::render_message(c_ide_app& app, const message_t& message, int 
 
     if (!message.content.empty())
     {
-        message_view_t& view = message_views[message_index];
-        std::string shown = reveal_content(message.content, view, now, dt);
-        bool revealing = shown.size() < message.content.size();
-        if (revealing)
-            shown += " ▍";
-        ImGui::Indent(2.0f * unit);
-        render_markdown(app, parse_markdown(shown), wrap_width - 4.0f * unit);
-        ImGui::Unindent(2.0f * unit);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.panel, 0.72f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * unit, 12.0f * unit));
+        ImGui::BeginChild("##ai_bubble", ImVec2(wrap_width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        std::string shown;
+        if (app.config.animations)
+        {
+            message_view_t& view = message_views[message_index];
+            shown = reveal_content(message.content, view, now, dt);
+            if (shown.size() < message.content.size())
+                shown += " ▍";
+        }
+        else
+            shown = message.content;
+        render_markdown(app, parse_markdown(shown), wrap_width - 34.0f * unit);
+        ImGui::EndChild();
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
     }
     ImGui::PopID();
     ImGui::Dummy(ImVec2(0.0f, 12.0f * unit));
@@ -649,10 +659,12 @@ void c_chat_panel::render_tool_card(c_ide_app& app, const tool_call_t& call, int
 
     ImVec2 icon_pos = ImGui::GetCursorScreenPos();
     float icon_line = ImGui::GetTextLineHeight();
-    float icon_box = icon_line + 8.0f * unit;
-    draw->AddRectFilled(ImVec2(icon_pos.x - 4.0f * unit, icon_pos.y - 4.0f * unit), ImVec2(icon_pos.x + icon_line + 4.0f * unit, icon_pos.y + icon_line + 4.0f * unit), running || !status.has_output ? theme.accent_u32(0.16f) : ImGui::ColorConvertFloat4ToU32(theme.with_alpha(status.ok ? colors.success : colors.danger, 0.15f)), 8.0f * unit);
-    draw->AddText(nullptr, icon_line * 0.92f, ImVec2(icon_pos.x + (icon_line - ImGui::CalcTextSize(icon).x) * 0.5f, icon_pos.y), ImGui::ColorConvertFloat4ToU32(running || !status.has_output ? theme.accent() : status.ok ? colors.success : colors.danger), icon);
-    ImGui::Dummy(ImVec2(icon_box, icon_line));
+    float icon_draw = icon_line * 0.95f;
+    ImVec2 glyph = theme.font_main->CalcTextSizeA(icon_draw, 32768.0f, 0.0f, icon);
+    float box_round = 8.0f * unit;
+    draw->AddRectFilled(ImVec2(icon_pos.x - 5.0f * unit, icon_pos.y - 4.0f * unit), ImVec2(icon_pos.x + icon_line + 5.0f * unit, icon_pos.y + icon_line + 4.0f * unit), running || !status.has_output ? theme.accent_u32(0.16f) : ImGui::ColorConvertFloat4ToU32(theme.with_alpha(status.ok ? colors.success : colors.danger, 0.15f)), box_round);
+    draw->AddText(theme.font_main, icon_draw, ImVec2(icon_pos.x + (icon_line - glyph.x) * 0.5f, icon_pos.y + (icon_line - glyph.y) * 0.5f), ImGui::ColorConvertFloat4ToU32(running || !status.has_output ? theme.accent() : status.ok ? colors.success : colors.danger), icon);
+    ImGui::Dummy(ImVec2(icon_line + 10.0f * unit, icon_line));
     ImGui::SameLine(0.0f, 10.0f * unit);
 
     float label_size = ImGui::CalcTextSize(label.c_str()).x;

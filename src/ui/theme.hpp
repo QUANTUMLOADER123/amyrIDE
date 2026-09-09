@@ -43,7 +43,7 @@ public:
     ImFont* font_bold = nullptr;
     ImFont* font_mono = nullptr;
 
-    void load_fonts(float dpi_scale, const char* font_directory);
+    void load_fonts(float dpi_scale);
     void apply_style();
     void shutdown();
 

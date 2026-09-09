@@ -133,6 +133,7 @@
     <ClInclude Include="src\platform\shell.hpp" />
     <ClInclude Include="src\ui\chat.hpp" />
     <ClInclude Include="src\ui\highlight.hpp" />
+    <ClInclude Include="src\ui\fonts.hpp" />
     <ClInclude Include="src\ui\icons.hpp" />
     <ClInclude Include="src\ui\markdown.hpp" />
     <ClInclude Include="src\ui\settings.hpp" />

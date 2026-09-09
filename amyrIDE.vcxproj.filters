@@ -137,6 +137,9 @@
     <ClInclude Include="src\ui\icons.hpp">
       <Filter>ui</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\fonts.hpp">
+      <Filter>ui</Filter>
+    </ClInclude>
     <ClInclude Include="src\ui\markdown.hpp">
       <Filter>ui</Filter>
     </ClInclude>

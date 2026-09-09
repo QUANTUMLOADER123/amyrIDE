@@ -46,23 +46,7 @@ c_ide_app::c_ide_app()
 void c_ide_app::initialize(void* hwnd)
 {
     window_handle = hwnd;
-    std::string executable = shell::executable_dir();
-    std::string font_candidates[] = {
-        executable + "fonts\\",
-        executable + "..\\..\\vendor\\fonts\\",
-        executable + "..\\..\\..\\vendor\\fonts\\",
-        executable
-    };
-    std::string font_directory = executable;
-    for (const std::string& candidate : font_candidates)
-    {
-        if (shell::path_exists(candidate + "Inter-Regular.ttf"))
-        {
-            font_directory = candidate;
-            break;
-        }
-    }
-    theme.load_fonts(shell::window_dpi_scale(hwnd), font_directory.c_str());
+    theme.load_fonts(shell::window_dpi_scale(hwnd));
     theme.accent_index = config.accent_index;
     theme.apply_style();
 

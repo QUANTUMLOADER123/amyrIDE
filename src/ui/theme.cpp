@@ -1,11 +1,12 @@
 #include "theme.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <string>
 
 #include "core/config.hpp"
+#include "fonts.hpp"
 #include "icons.hpp"
-#include "platform/shell.hpp"
 
 namespace
 {
@@ -41,47 +42,40 @@ namespace
         0x2116, 0x2116,
         0x20BD, 0x20BD,
         0x2190, 0x21BB,
+        0x2580, 0x259F,
         0
     };
 }
 
-void c_theme::load_fonts(float dpi_scale, const char* font_directory)
+namespace
+{
+    ImFont* add_memory_font(ImFontAtlas* atlas, const unsigned char* data, unsigned int size, float size_pixels, const ImFontConfig* config, const ImWchar* ranges)
+    {
+        unsigned char* copy = new unsigned char[size];
+        std::memcpy(copy, data, size);
+        return atlas->AddFontFromMemoryTTF(copy, static_cast<int>(size), size_pixels, config, ranges);
+    }
+}
+
+void c_theme::load_fonts(float dpi_scale)
 {
     ImGuiIO& io = ImGui::GetIO();
     ImFontAtlas* atlas = io.Fonts;
 
     font_base = default_font_size * dpi_scale;
 
-    std::string regular_path = std::string(font_directory) + "Inter-Regular.ttf";
-    std::string semibold_path = std::string(font_directory) + "Inter-SemiBold.ttf";
-    std::string mono_path = std::string(font_directory) + "JetBrainsMono-Regular.ttf";
-    std::string mono_bold_path = std::string(font_directory) + "JetBrainsMono-SemiBold.ttf";
-    std::string icons_path = std::string(font_directory) + "fa-solid-900.ttf";
-
     ImFontConfig icons_config;
     icons_config.MergeMode = true;
     icons_config.PixelSnapH = false;
     icons_config.GlyphMinAdvanceX = font_base * 0.92f;
 
-    font_main = atlas->AddFontFromFileTTF(regular_path.c_str(), font_base, nullptr, text_glyph_ranges);
-    if (font_main)
-        atlas->AddFontFromFileTTF(icons_path.c_str(), font_base * 0.80f, &icons_config, icon_glyphs);
-    else
-        font_main = atlas->AddFontFromFileTTF((std::string(font_directory) + "JetBrainsMono-Regular.ttf").c_str(), font_base, nullptr, text_glyph_ranges);
-    if (!font_main)
-        font_main = atlas->AddFontDefault();
-    if (font_main && shell::path_exists(icons_path))
-        atlas->AddFontFromFileTTF(icons_path.c_str(), font_base * 0.80f, &icons_config, icon_glyphs);
+    font_main = add_memory_font(atlas, font_data::inter_regular, font_data::inter_regular_size, font_base, nullptr, text_glyph_ranges);
+    add_memory_font(atlas, font_data::fa_solid, font_data::fa_solid_size, font_base * 0.80f, &icons_config, icon_glyphs);
 
-    font_bold = atlas->AddFontFromFileTTF(semibold_path.c_str(), font_base, nullptr, text_glyph_ranges);
-    if (!font_bold)
-        font_bold = font_main;
-    if (font_bold && shell::path_exists(icons_path))
-        atlas->AddFontFromFileTTF(icons_path.c_str(), font_base * 0.80f, &icons_config, icon_glyphs);
+    font_bold = add_memory_font(atlas, font_data::inter_semibold, font_data::inter_semibold_size, font_base, nullptr, text_glyph_ranges);
+    add_memory_font(atlas, font_data::fa_solid, font_data::fa_solid_size, font_base * 0.80f, &icons_config, icon_glyphs);
 
-    font_mono = atlas->AddFontFromFileTTF(mono_path.c_str(), font_base * 0.92f, nullptr, text_glyph_ranges);
-    if (!font_mono)
-        font_mono = atlas->AddFontFromFileTTF(mono_bold_path.c_str(), font_base * 0.92f, nullptr, text_glyph_ranges);
+    font_mono = add_memory_font(atlas, font_data::jbmono_regular, font_data::jbmono_regular_size, font_base * 0.92f, nullptr, text_glyph_ranges);
     if (!font_mono)
         font_mono = font_main;
 }
