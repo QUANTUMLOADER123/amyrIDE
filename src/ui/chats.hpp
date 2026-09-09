@@ -14,4 +14,8 @@ public:
 private:
     char search[128] = {};
     std::string selected_project;
+    bool add_requested = false;
+    bool new_session_requested = false;
+    std::string open_requested_id;
+    std::string open_requested_project;
 };

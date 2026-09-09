@@ -86,14 +86,7 @@ void c_chats_overlay::draw(c_ide_app& app)
     ImGui::PopFont();
     ImGui::SameLine(ImGui::GetContentRegionMax().x - 30.0f * unit);
     if (icon_button(theme, icon_plus, "##add_project", "добавить папку"))
-    {
-        visible = false;
-        app.add_current_project();
-        ImGui::PopID();
-        ImGui::EndChild();
-        ImGui::End();
-        return;
-    }
+        add_requested = true;
     ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
 
     for (const project_info_t& project : app.projects())
@@ -149,20 +142,7 @@ void c_chats_overlay::draw(c_ide_app& app)
     search_input(theme, "##chat_search", search, sizeof(search), "поиск сессий", search_width);
     ImGui::SameLine(0.0f, 12.0f * unit);
     if (accent_button(theme, "новая сессия", ImVec2(new_button_width, ImGui::GetTextLineHeight() + 12.0f * unit)))
-    {
-        visible = false;
-        if (app.workspace.valid && selected_project == app.workspace.root.string())
-            app.new_chat();
-        else
-        {
-            app.set_workspace(selected_project);
-            app.new_chat();
-        }
-        ImGui::Unindent(20.0f * unit);
-        ImGui::EndChild();
-        ImGui::End();
-        return;
-    }
+        new_session_requested = true;
     ImGui::Dummy(ImVec2(0.0f, 10.0f * unit));
 
     std::string needle = to_lower_copy(str::trim(search));
@@ -227,8 +207,8 @@ void c_chats_overlay::draw(c_ide_app& app)
 
         if (ImGui::IsItemClicked() && !app.ai.busy())
         {
-            visible = false;
-            app.open_chat(meta);
+            open_requested_id = meta.id;
+            open_requested_project = meta.project_path;
         }
         ImGui::PopID();
     }
@@ -241,4 +221,39 @@ void c_chats_overlay::draw(c_ide_app& app)
 
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
         visible = false;
+
+    if (add_requested)
+    {
+        add_requested = false;
+        visible = false;
+        app.add_current_project();
+    }
+    if (new_session_requested)
+    {
+        new_session_requested = false;
+        visible = false;
+        if (app.workspace.valid && selected_project == app.workspace.root.string())
+            app.new_chat();
+        else
+        {
+            app.set_workspace(selected_project);
+            app.new_chat();
+        }
+    }
+    if (!open_requested_id.empty())
+    {
+        std::string id = open_requested_id;
+        std::string project = open_requested_project;
+        open_requested_id.clear();
+        open_requested_project.clear();
+        visible = false;
+        for (const chat_meta_t& meta : app.chats())
+        {
+            if (meta.id == id && meta.project_path == project)
+            {
+                app.open_chat(meta);
+                break;
+            }
+        }
+    }
 }
