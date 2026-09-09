@@ -113,6 +113,7 @@ namespace
         float unit = theme.scale();
         if (runs.empty())
             return;
+        wrap_width = std::max(wrap_width, 80.0f * unit);
 
         std::vector<layout_piece_t> pieces;
         std::vector<layout_rect_t> pill_rects;
