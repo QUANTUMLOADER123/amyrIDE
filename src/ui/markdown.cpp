@@ -240,9 +240,13 @@ namespace
         highlight_lang lang = highlight_lang_from_name(block.lang);
         std::vector<std::string> code_lines = block.text.empty() ? std::vector<std::string>{} : str::split(block.text, '\n');
         float line_height = ImGui::GetTextLineHeight();
-        float body_height = line_height * static_cast<float>(code_lines.size()) + 10.0f * unit;
-        float max_height = 360.0f * unit;
-        float view_height = body_height > max_height ? max_height : body_height;
+        float char_width = ImGui::CalcTextSize(" ").x;
+        size_t max_cols = 0;
+        for (const std::string& code_line : code_lines)
+            max_cols = std::max(max_cols, static_cast<size_t>(std::max(utf8::column_count(code_line), 0)));
+        bool needs_horizontal = 14.0f * unit + static_cast<float>(max_cols) * char_width + 24.0f * unit > wrap_width;
+        float body_height = line_height * static_cast<float>(code_lines.size()) + 10.0f * unit + (needs_horizontal ? ImGui::GetStyle().ScrollbarSize : 0.0f);
+        float view_height = body_height;
         float header_height = 30.0f * unit;
         float block_width = wrap_width;
 
@@ -290,9 +294,8 @@ namespace
             app.apply_code_block(target_path, block.text);
 
         ImGui::SetCursorPos(ImVec2(0.0f, header_height));
-        ImGui::BeginChild(id_body, ImVec2(block_width, view_height), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        ImGui::BeginChild(id_body, ImVec2(block_width, view_height), ImGuiChildFlags_None, ImGuiWindowFlags_None);
         ImGui::PushFont(theme.font_mono, ImGui::GetStyle().FontSizeBase * 0.92f);
-        float char_width = ImGui::CalcTextSize(" ").x;
         float scroll_x = ImGui::GetScrollX();
         float body_left = 14.0f * unit;
         int state = 0;
