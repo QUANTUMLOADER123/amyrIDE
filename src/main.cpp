@@ -136,9 +136,12 @@ static LRESULT WINAPI window_procedure(HWND window, UINT message, WPARAM wparam,
         }
 
         unsigned int dpi_title = MulDiv(title_bar_height_logical, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
-        unsigned int control_strip = MulDiv(120, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
-        if (cursor.y < static_cast<long>(dpi_title) && cursor.x < client.right - static_cast<long>(control_strip))
+        if (cursor.y < static_cast<long>(dpi_title))
+        {
+            if (g_app && g_app->titlebar_hit(static_cast<float>(GET_X_LPARAM(lparam)), static_cast<float>(GET_Y_LPARAM(lparam))))
+                return HTCLIENT;
             return HTCAPTION;
+        }
         return HTCLIENT;
     }
     case WM_NCACTIVATE:

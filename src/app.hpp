@@ -42,6 +42,7 @@ public:
 
     void open_workspace_dialog();
     void set_workspace(const std::string& path);
+    bool titlebar_hit(float x, float y) const;
     std::vector<project_info_t>& projects();
     std::vector<chat_meta_t>& chats();
     std::string active_chat() const { return active_chat_id; }
@@ -85,6 +86,13 @@ private:
     std::vector<project_info_t> project_list;
     std::vector<chat_meta_t> chat_list;
     std::string active_chat_id;
+    float title_chats_min[2] = { 0.0f, 0.0f };
+    float title_chats_max[2] = { 0.0f, 0.0f };
+    float title_ring_min[2] = { 0.0f, 0.0f };
+    float title_ring_max[2] = { 0.0f, 0.0f };
+    float title_gear_min[2] = { 0.0f, 0.0f };
+    float title_gear_max[2] = { 0.0f, 0.0f };
+    bool title_widgets_valid = false;
 
     void draw_background();
     void draw_welcome();

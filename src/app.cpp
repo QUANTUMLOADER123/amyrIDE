@@ -581,7 +581,10 @@ void c_ide_app::draw_welcome()
 
 void c_ide_app::draw_assistant()
 {
+    float unit = theme.scale();
+    ImGui::Indent(16.0f * unit);
     chat.render(*this);
+    ImGui::Unindent(16.0f * unit);
 }
 
 void c_ide_app::draw_titlebar(void* hwnd)
@@ -602,7 +605,10 @@ void c_ide_app::draw_titlebar(void* hwnd)
     ImGui::PopFont();
 
     if (!workspace.valid)
+    {
+        title_widgets_valid = false;
         return;
+    }
 
     float unit2 = theme_ref.scale();
     float content_height = ImGui::GetTextLineHeight();
@@ -624,6 +630,10 @@ void c_ide_app::draw_titlebar(void* hwnd)
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     if (ImGui::IsMouseHoveringRect(chats_min, chats_max) && ImGui::IsMouseClicked(0))
         chats_overlay.visible = !chats_overlay.visible;
+    title_chats_min[0] = chats_min.x;
+    title_chats_min[1] = chats_min.y;
+    title_chats_max[0] = chats_max.x;
+    title_chats_max[1] = chats_max.y;
 
     float gear_size = content_height + 8.0f * unit2;
     float right_x = io.DisplaySize.x - 14.0f * unit2;
@@ -646,7 +656,11 @@ void c_ide_app::draw_titlebar(void* hwnd)
         draw->PathArcTo(ring_center, ring_radius, -1.5707963f, sweep, 30);
         draw->PathStroke(ImGui::ColorConvertFloat4ToU32(ring_color), 0, 3.0f * unit2);
     }
-    if (ImGui::IsMouseHoveringRect(ImVec2(ring_x - ring_radius - 4.0f * unit2, widget_center - ring_radius - 4.0f * unit2), ImVec2(ring_x + ring_radius + 4.0f * unit2, widget_center + ring_radius + 4.0f * unit2)))
+    title_ring_min[0] = ring_x - ring_radius - 4.0f * unit2;
+    title_ring_min[1] = widget_center - ring_radius - 4.0f * unit2;
+    title_ring_max[0] = ring_x + ring_radius + 4.0f * unit2;
+    title_ring_max[1] = widget_center + ring_radius + 4.0f * unit2;
+    if (ImGui::IsMouseHoveringRect(ImVec2(title_ring_min[0], title_ring_min[1]), ImVec2(title_ring_max[0], title_ring_max[1])))
     {
         ImGui::SetTooltip("контекст: %s / %s токенов\nосталось: %s\nмодель: %s", str::format_count(ai.total_tokens()).c_str(), str::format_count(config.context_limit).c_str(), str::format_count(config.context_limit - ai.total_tokens() > 0 ? config.context_limit - ai.total_tokens() : 0).c_str(), config.model.c_str());
     }
@@ -663,6 +677,21 @@ void c_ide_app::draw_titlebar(void* hwnd)
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     if (gear_hovered && ImGui::IsMouseClicked(0))
         settings.visible = !settings.visible;
+    title_gear_min[0] = gear_min.x;
+    title_gear_min[1] = gear_min.y;
+    title_gear_max[0] = gear_max.x;
+    title_gear_max[1] = gear_max.y;
+    title_widgets_valid = true;
+}
+
+bool c_ide_app::titlebar_hit(float x, float y) const
+{
+    if (!title_widgets_valid)
+        return false;
+    bool chats = x >= title_chats_min[0] && x <= title_chats_max[0] && y >= title_chats_min[1] && y <= title_chats_max[1];
+    bool ring = x >= title_ring_min[0] && x <= title_ring_max[0] && y >= title_ring_min[1] && y <= title_ring_max[1];
+    bool gear = x >= title_gear_min[0] && x <= title_gear_max[0] && y >= title_gear_min[1] && y <= title_gear_max[1];
+    return chats || ring || gear;
 }
 
 void c_ide_app::draw_statusbar()

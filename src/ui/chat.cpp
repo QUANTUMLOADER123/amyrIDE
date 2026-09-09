@@ -275,7 +275,7 @@ void c_chat_panel::render_history(c_ide_app& app)
     std::vector<message_t> history = app.ai.history_snapshot();
     active_tool_t running_tool = app.ai.active_tool_snapshot();
 
-    ImGui::BeginChild("##history", ImVec2(0.0f, -below_height), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    ImGui::BeginChild("##history", ImVec2(-16.0f * unit, -below_height), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
     if (history.empty())
     {
@@ -381,7 +381,7 @@ void c_chat_panel::render_plan_strip(c_ide_app& app)
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.06f));
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f * unit);
-    ImGui::BeginChild("##plan_strip", ImVec2(0.0f, strip_height), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("##plan_strip", ImVec2(-16.0f * unit, strip_height), ImGuiChildFlags_Borders);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f * unit);
     ImGui::Indent(12.0f * unit);
     ImGui::TextColored(theme.accent(), "%s", icon_list_check);
@@ -419,7 +419,7 @@ void c_chat_panel::render_plan_strip(c_ide_app& app)
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, colors.panel);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f * unit);
-    ImGui::BeginChild("##plan_body", ImVec2(0.0f, ImGui::GetTextLineHeight() * static_cast<float>(plan.size()) + 20.0f * unit), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("##plan_body", ImVec2(-16.0f * unit, ImGui::GetTextLineHeight() * static_cast<float>(plan.size()) + 20.0f * unit), ImGuiChildFlags_Borders);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f * unit);
     ImGui::Indent(12.0f * unit);
     for (size_t i = 0; i < plan.size(); ++i)
@@ -735,7 +735,7 @@ void c_chat_panel::render_composer(c_ide_app& app)
     ImGui::PushStyleColor(ImGuiCol_ChildBg, colors.elevated);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f * unit, 10.0f * unit));
-    ImGui::BeginChild("##composer", ImVec2(0.0f, composer_height), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("##composer", ImVec2(-16.0f * unit, composer_height), ImGuiChildFlags_Borders);
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor();
 

@@ -141,8 +141,9 @@ namespace
                     }
                     flow = wrapped;
                 }
+                bool hard_wrapped = flow.find('\n') != std::string::npos;
                 ImVec2 piece_size = ImGui::CalcTextSize(flow.c_str());
-                bool draw_pill = run.code && flow.find('\n') == std::string::npos && piece_size.x + 10.0f * unit <= wrap_width;
+                bool draw_pill = run.code && !hard_wrapped && piece_size.x + 10.0f * unit <= wrap_width;
                 if (draw_pill)
                 {
                     ImVec2 pill_min = ImGui::GetCursorScreenPos();
@@ -154,7 +155,7 @@ namespace
                 ImGui::PopFont();
 
                 bool last = i + 1 >= runs.size();
-                if (!last && !ends_line)
+                if (!last && !ends_line && !hard_wrapped)
                     ImGui::SameLine(0.0f, 0.0f);
             }
         }
