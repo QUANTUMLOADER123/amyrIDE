@@ -137,20 +137,6 @@ static LRESULT WINAPI window_procedure(HWND window, UINT message, WPARAM wparam,
 
         return HTCLIENT;
     }
-    case WM_LBUTTONDOWN:
-    {
-        unsigned int dpi = GetDpiForWindow(window);
-        unsigned int bar = MulDiv(title_bar_height_logical, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
-        POINT cursor{ GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam) };
-        if (cursor.y >= 0 && cursor.y < static_cast<long>(bar) && g_app && !g_app->titlebar_hit(static_cast<float>(cursor.x), static_cast<float>(cursor.y)))
-        {
-            ReleaseCapture();
-            SendMessageW(window, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-            ImGui::GetIO().AddMouseButtonEvent(0, false);
-            return 0;
-        }
-        break;
-    }
     case WM_NCACTIVATE:
         return DefWindowProcW(window, message, wparam, -1);
     case WM_ERASEBKGND:

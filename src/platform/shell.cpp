@@ -13,6 +13,13 @@
 
 namespace shell
 {
+    void begin_window_drag(void* hwnd)
+    {
+        HWND window = static_cast<HWND>(hwnd);
+        ReleaseCapture();
+        SendMessageW(window, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+    }
+
     std::wstring to_wide(std::string_view text)
     {
         if (text.empty())

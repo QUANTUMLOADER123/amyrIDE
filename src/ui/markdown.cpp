@@ -239,6 +239,7 @@ namespace
 
         highlight_lang lang = highlight_lang_from_name(block.lang);
         std::vector<std::string> code_lines = block.text.empty() ? std::vector<std::string>{} : str::split(block.text, '\n');
+        ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
         float line_height = ImGui::GetTextLineHeight();
         float char_width = ImGui::CalcTextSize(" ").x;
         size_t max_cols = 0;
@@ -315,7 +316,7 @@ namespace
         ImGui::PopFont();
         ImGui::EndChild();
         ImGui::EndChild();
-        ImGui::Dummy(ImVec2(0.0f, 6.0f * unit));
+        ImGui::Dummy(ImVec2(0.0f, 14.0f * unit));
     }
 }
 

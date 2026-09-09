@@ -20,6 +20,18 @@
 namespace
 {
     constexpr int composer_rows = 3;
+
+    std::string tools_word(size_t count)
+    {
+        size_t tail = count % 10;
+        if (count % 100 >= 11 && count % 100 <= 14)
+            return "инструментов";
+        if (tail == 1)
+            return "инструмент";
+        if (tail >= 2 && tail <= 4)
+            return "инструмента";
+        return "инструментов";
+    }
     constexpr float reveal_bytes_per_second = 850.0f;
     constexpr float reveal_catchup_bytes = 1100.0f;
     constexpr float card_appear_seconds = 0.30f;
@@ -306,14 +318,30 @@ void c_chat_panel::render_history(c_ide_app& app)
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(9.0f * unit, 6.0f * unit));
     float wrap_width = ImGui::GetContentRegionAvail().x - 22.0f * unit;
     float ai_width = std::max(wrap_width / 1.5f, 340.0f * unit);
-    for (size_t i = 0; i < history.size(); ++i)
-        render_message(app, history, static_cast<int>(i), wrap_width, ai_width);
-
-    if (app.ai.busy())
+    bool busy = app.ai.busy();
+    bool running_rendered = false;
+    for (size_t i = 0; i < history.size();)
     {
-        if (running_tool.running)
+        if (history[i].role != "assistant")
+        {
+            render_message(app, history, static_cast<int>(i), wrap_width);
+            ++i;
+            continue;
+        }
+        size_t group_end = i;
+        while (group_end < history.size() && history[group_end].role == "assistant")
+            ++group_end;
+        bool append_running = busy && running_tool.running && group_end == history.size();
+        running_rendered = running_rendered || append_running;
+        render_assistant_group(app, history, i, group_end, ai_width, append_running);
+        i = group_end;
+    }
+
+    if (busy)
+    {
+        if (running_tool.running && !running_rendered)
             render_tool_card(app, tool_call_t{ running_tool.id, running_tool.name, running_tool.arguments }, static_cast<int>(history.size()), 0, true, nullptr, ai_width - 32.0f * unit, false);
-        else
+        else if (!running_tool.running)
         {
             ImGui::Indent(4.0f * unit);
             spinner(theme, 6.5f * unit, 2.0f * unit);
@@ -326,7 +354,6 @@ void c_chat_panel::render_history(c_ide_app& app)
     }
     ImGui::PopStyleVar();
 
-    bool busy = app.ai.busy();
     bool stick = ImGui::GetScrollY() + ImGui::GetWindowHeight() >= ImGui::GetScrollMaxY() - 90.0f;
     float stream_progress = static_cast<float>(history.size()) + (busy ? 1.0f : 0.0f);
     if (stream_progress != last_stream_size && stick)
@@ -423,13 +450,11 @@ void c_chat_panel::render_plan_strip(c_ide_app& app)
     ImGui::Dummy(ImVec2(0.0f, 4.0f * unit));
 }
 
-void c_chat_panel::render_message(c_ide_app& app, const std::vector<message_t>& history, int message_index, float wrap_width, float ai_width)
+void c_chat_panel::render_message(c_ide_app& app, const std::vector<message_t>& history, int message_index, float wrap_width)
 {
     c_theme& theme = app.theme;
     const palette_t& colors = theme.palette();
     float unit = theme.scale();
-    float dt = ImGui::GetIO().DeltaTime;
-    float now = anim::time_now();
     const message_t& message = history[static_cast<size_t>(message_index)];
 
     if (message.internal_note && message.role == "user")
@@ -447,108 +472,139 @@ void c_chat_panel::render_message(c_ide_app& app, const std::vector<message_t>& 
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0.0f, 8.0f * unit));
-        return;
-    }
-
-    if (message.role == "tool")
-        return;
-
-    bool is_user = message.role == "user";
-    if (!is_user)
-    {
-        message_view_t& view = message_views[message_index];
-        if (view.born_time <= 0.0f)
-            view.born_time = now;
-    }
-
-    ImGui::PushID(str::format("msg_%d", message_index).c_str());
-    if (is_user)
-    {
-        float indent = wrap_width * 0.14f;
-        float bubble_width = wrap_width - indent;
-        ImGui::Indent(indent);
-        ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.82f);
-        ImGui::TextColored(colors.text_faint, "%s", "ты");
-        ImGui::PopFont();
-        if (!app.ai.busy())
-        {
-            ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 24.0f * unit);
-            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.75f);
-            if (icon_button(theme, icon_pen, "##edit_msg", "редактировать и переотправить", 0.0f))
-            {
-                input = message.content;
-                editing_index = message_index;
-                input_focus_requested = true;
-            }
-            ImGui::PopStyleVar();
-        }
-
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.10f));
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * unit, 12.0f * unit));
-        ImGui::BeginChild("##user_bubble", ImVec2(bubble_width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
-        render_markdown(app, parse_markdown(message.content), bubble_width - 34.0f * unit);
-        ImGui::EndChild();
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor();
-        ImGui::Unindent(indent);
-        ImGui::Dummy(ImVec2(0.0f, 12.0f * unit));
         ImGui::PopID();
         return;
     }
 
+    if (message.role != "user")
+        return;
+
+    float indent = wrap_width * 0.14f;
+    float bubble_width = wrap_width - indent;
+    ImGui::PushID(str::format("msg_%d", message_index).c_str());
+    ImGui::Indent(indent);
+    ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.82f);
+    ImGui::TextColored(colors.text_faint, "%s", "ты");
+    ImGui::PopFont();
+    if (!app.ai.busy())
+    {
+        ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 24.0f * unit);
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.75f);
+        if (icon_button(theme, icon_pen, "##edit_msg", "редактировать и переотправить", 0.0f))
+        {
+            input = message.content;
+            editing_index = message_index;
+            input_focus_requested = true;
+        }
+        ImGui::PopStyleVar();
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.accent, 0.10f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * unit, 12.0f * unit));
+    ImGui::BeginChild("##user_bubble", ImVec2(bubble_width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    render_markdown(app, parse_markdown(message.content), bubble_width - 34.0f * unit);
+    ImGui::EndChild();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
+    ImGui::Unindent(indent);
+    ImGui::Dummy(ImVec2(0.0f, 12.0f * unit));
+    ImGui::PopID();
+}
+
+void c_chat_panel::render_assistant_group(c_ide_app& app, const std::vector<message_t>& history, size_t begin, size_t end, float ai_width, bool append_running)
+{
+    c_theme& theme = app.theme;
+    const palette_t& colors = theme.palette();
+    float unit = theme.scale();
+    float dt = ImGui::GetIO().DeltaTime;
+    float now = anim::time_now();
+
+    size_t total_tools = 0;
+    bool has_any = append_running;
+    for (size_t m = begin; m < end; ++m)
+    {
+        total_tools += history[m].tool_calls.size();
+        if (!history[m].content.empty())
+            has_any = true;
+    }
+
+    ImGui::PushID(str::format("turn_%d", static_cast<int>(begin)).c_str());
     ImGui::PushFont(theme.font_bold, ImGui::GetStyle().FontSizeBase * 0.82f);
     ImGui::TextColored(theme.accent(), "%s", "nimbus");
     ImGui::PopFont();
     ImGui::SameLine(0.0f, 8.0f * unit);
-    if (!message.content.empty())
-        ImGui::TextColored(colors.text_faint, "%d токенов", message.token_estimate);
+    if (total_tools > 0)
+        ImGui::TextColored(colors.text_faint, "%zu %s", total_tools, tools_word(total_tools).c_str());
+    else
+        ImGui::TextColored(colors.text_faint, "%d токенов", history[end - 1].token_estimate);
 
-    bool has_tools = !message.tool_calls.empty();
-    if (has_tools || !message.content.empty())
+    if (has_any)
     {
         float inner_width = ai_width - 32.0f * unit;
         ImGui::PushStyleColor(ImGuiCol_ChildBg, theme.with_alpha(colors.panel, 0.72f));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 14.0f * unit);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f * unit, 12.0f * unit));
         ImGui::BeginChild("##ai_bubble", ImVec2(ai_width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
-        for (size_t c = 0; c < message.tool_calls.size(); ++c)
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        bool prev_content = false;
+        for (size_t m = begin; m < end; ++m)
         {
-            const tool_call_t& call = message.tool_calls[c];
-            const message_t* output = nullptr;
-            for (size_t j = static_cast<size_t>(message_index) + 1; j < history.size(); ++j)
+            const message_t& message = history[m];
+            bool has_tools = !message.tool_calls.empty();
+            bool has_text = !message.content.empty();
+            if ((has_tools || has_text) && prev_content)
             {
-                if (history[j].role == "tool" && history[j].tool_call_id == call.id)
+                ImVec2 sep_pos = ImGui::GetCursorScreenPos();
+                draw->AddLine(ImVec2(sep_pos.x, sep_pos.y + 5.0f * unit), ImVec2(sep_pos.x + inner_width, sep_pos.y + 5.0f * unit), ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.border, 0.5f)));
+                ImGui::Dummy(ImVec2(inner_width, 14.0f * unit));
+            }
+            for (size_t c = 0; c < message.tool_calls.size(); ++c)
+            {
+                const tool_call_t& call = message.tool_calls[c];
+                const message_t* output = nullptr;
+                for (size_t j = m + 1; j < history.size(); ++j)
                 {
-                    output = &history[j];
-                    break;
+                    if (history[j].role == "tool" && history[j].tool_call_id == call.id)
+                    {
+                        output = &history[j];
+                        break;
+                    }
                 }
+                std::string output_text = output ? output->content : "";
+                if (output_text.starts_with("ERROR: "))
+                    output_text = "ERR " + output_text.substr(7);
+                render_tool_card(app, call, static_cast<int>(m), static_cast<int>(c), false, output ? &output_text : nullptr, inner_width, true);
             }
-            std::string output_text = output ? output->content : "";
-            if (output_text.starts_with("ERROR: "))
-                output_text = "ERR " + output_text.substr(7);
-            render_tool_card(app, call, message_index, static_cast<int>(c), false, output ? &output_text : nullptr, inner_width, true);
-        }
-        if (has_tools && !message.content.empty())
-        {
-            ImDrawList* draw = ImGui::GetWindowDrawList();
-            ImVec2 sep_pos = ImGui::GetCursorScreenPos();
-            draw->AddLine(ImVec2(sep_pos.x, sep_pos.y + 5.0f * unit), ImVec2(sep_pos.x + inner_width, sep_pos.y + 5.0f * unit), ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.border, 0.5f)));
-            ImGui::Dummy(ImVec2(inner_width, 14.0f * unit));
-        }
-        if (!message.content.empty())
-        {
-            std::string shown;
-            if (app.config.animations)
+            if (has_tools && has_text)
             {
-                message_view_t& view = message_views[message_index];
-                shown = reveal_content(message.content, view, now, dt);
-                if (shown.size() < message.content.size())
-                    shown += " ▍";
+                ImVec2 sep_pos = ImGui::GetCursorScreenPos();
+                draw->AddLine(ImVec2(sep_pos.x, sep_pos.y + 5.0f * unit), ImVec2(sep_pos.x + inner_width, sep_pos.y + 5.0f * unit), ImGui::ColorConvertFloat4ToU32(theme.with_alpha(colors.border, 0.5f)));
+                ImGui::Dummy(ImVec2(inner_width, 14.0f * unit));
             }
-            else
-                shown = message.content;
-            render_markdown(app, parse_markdown(shown), inner_width - 2.0f * unit);
+            if (has_text)
+            {
+                std::string shown;
+                if (app.config.animations)
+                {
+                    message_view_t& view = message_views[static_cast<int>(m)];
+                    shown = reveal_content(message.content, view, now, dt);
+                    if (shown.size() < message.content.size())
+                        shown += " ▍";
+                }
+                else
+                    shown = message.content;
+                render_markdown(app, parse_markdown(shown), inner_width - 2.0f * unit);
+            }
+            if (has_tools || has_text)
+                prev_content = true;
+        }
+        if (append_running)
+        {
+            active_tool_t running_tool = app.ai.active_tool_snapshot();
+            if (prev_content)
+                ImGui::Dummy(ImVec2(inner_width, 4.0f * unit));
+            render_tool_card(app, tool_call_t{ running_tool.id, running_tool.name, running_tool.arguments }, static_cast<int>(end), 0, true, nullptr, inner_width, true);
         }
         ImGui::EndChild();
         ImGui::PopStyleVar(2);

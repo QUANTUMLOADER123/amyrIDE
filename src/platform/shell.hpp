@@ -6,6 +6,8 @@
 
 namespace shell
 {
+    void begin_window_drag(void* hwnd);
+
     bool pick_folder(std::string& out_utf8);
     std::vector<std::string> pick_files();
     std::string appdata_dir();

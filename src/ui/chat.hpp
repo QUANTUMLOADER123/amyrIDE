@@ -33,7 +33,8 @@ private:
     void render_history(c_ide_app& app);
     void render_plan_strip(c_ide_app& app);
     void render_composer(c_ide_app& app);
-    void render_message(c_ide_app& app, const std::vector<message_t>& history, int message_index, float wrap_width, float ai_width);
+    void render_message(c_ide_app& app, const std::vector<message_t>& history, int message_index, float wrap_width);
+    void render_assistant_group(c_ide_app& app, const std::vector<message_t>& history, size_t begin, size_t end, float ai_width, bool append_running);
     void render_tool_card(c_ide_app& app, const tool_call_t& call, int message_index, int call_index, bool running, const std::string* output, float row_width, bool in_bubble);
     std::string build_context_block(c_ide_app& app) const;
 
