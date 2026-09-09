@@ -86,6 +86,27 @@ namespace
         return runs;
     }
 
+    struct layout_piece_t
+    {
+        std::string text;
+        ImVec2 pos;
+        ImFont* font;
+        float size;
+        ImU32 color;
+        bool code;
+    };
+
+    struct layout_rect_t
+    {
+        ImVec2 min_corner;
+        ImVec2 max_corner;
+    };
+
+    float measure_text(ImFont* font, float size, const std::string& text)
+    {
+        return font->CalcTextSizeA(size, 32768.0f, 0.0f, text.c_str()).x;
+    }
+
     void render_runs(c_theme& theme, const std::vector<inline_run_t>& runs, float wrap_width, const ImVec4& base_color)
     {
         const palette_t& colors = theme.palette();
@@ -93,18 +114,43 @@ namespace
         if (runs.empty())
             return;
 
-        float wrap_right = ImGui::GetCursorScreenPos().x + wrap_width;
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-        ImGui::PushTextWrapPos(wrap_right);
+        std::vector<layout_piece_t> pieces;
+        std::vector<layout_rect_t> pill_rects;
 
-        for (size_t i = 0; i < runs.size(); ++i)
+        ImVec2 origin = ImGui::GetCursorScreenPos();
+        float wrap_right = origin.x + wrap_width;
+        float base_line_height = ImGui::GetTextLineHeight() * 1.36f;
+        float cursor_x = origin.x;
+        float cursor_y = origin.y;
+        float line_height = 0.0f;
+        float code_span_begin = -1.0f;
+
+        auto close_code_span = [&](float span_end)
         {
-            const inline_run_t& run = runs[i];
+            float top = cursor_y + 1.0f;
+            float bottom = cursor_y + line_height - 1.0f;
+            pill_rects.push_back({ ImVec2(code_span_begin - 5.0f * unit, top), ImVec2(span_end + 5.0f * unit, bottom) });
+            code_span_begin = -1.0f;
+        };
+
+        auto break_line = [&]()
+        {
+            if (code_span_begin >= 0.0f)
+                close_code_span(cursor_x);
+            cursor_x = origin.x;
+            cursor_y += line_height > 0.0f ? line_height : base_line_height;
+            line_height = 0.0f;
+        };
+
+        for (const inline_run_t& run : runs)
+        {
             float font_size = ImGui::GetStyle().FontSizeBase * (run.heading_run ? 1.0f + 0.16f * static_cast<float>(run.heading_level) : 1.0f);
             ImFont* font = run.code ? theme.font_mono : run.bold || run.heading_run ? theme.font_bold : theme.font_main;
             ImVec4 color = base_color;
             if (run.code)
                 color = ImVec4(colors.accent.x * 0.40f + colors.text.x * 0.60f, colors.accent.y * 0.40f + colors.text.y * 0.60f, colors.accent.z * 0.40f + colors.text.z * 0.60f, 1.0f);
+            ImU32 tint = ImGui::ColorConvertFloat4ToU32(color);
+            float run_line_height = font_size * 1.36f;
 
             size_t scan = 0;
             while (scan <= run.text.size())
@@ -115,54 +161,73 @@ namespace
                 bool ends_line = newline != std::string::npos;
                 scan = ends_line ? newline + 1 : run.text.size() + 1;
 
-                if (fragment.empty())
-                    continue;
-
-                ImGui::PushFont(font, font_size);
-                std::string flow = fragment;
-                if (ImGui::CalcTextSize(flow.c_str()).x > wrap_width)
+                size_t token_at = 0;
+                while (token_at < fragment.size())
                 {
-                    std::string wrapped;
-                    float used = 0.0f;
-                    size_t walk = 0;
-                    while (walk < flow.size())
+                    bool space_token = fragment[token_at] == ' ';
+                    size_t token_end = token_at;
+                    while (token_end < fragment.size() && (fragment[token_end] == ' ') == space_token)
+                        token_end = utf8::next_position(fragment, token_end);
+                    std::string token = fragment.substr(token_at, token_end - token_at);
+                    token_at = token_end;
+
+                    if (space_token)
                     {
-                        size_t next = utf8::next_position(flow, walk);
-                        std::string symbol = flow.substr(walk, next - walk);
-                        float width = ImGui::CalcTextSize(symbol.c_str()).x;
-                        if (used + width > wrap_width)
+                        float space_width = measure_text(font, font_size, token);
+                        if (cursor_x + space_width < wrap_right)
                         {
-                            wrapped += '\n';
-                            used = 0.0f;
+                            pieces.push_back({ token, ImVec2(cursor_x, cursor_y), font, font_size, tint, false });
+                            cursor_x += space_width;
                         }
-                        wrapped += symbol;
-                        used += width;
-                        walk = next;
+                        continue;
                     }
-                    flow = wrapped;
-                }
-                bool hard_wrapped = flow.find('\n') != std::string::npos;
-                ImVec2 piece_size = ImGui::CalcTextSize(flow.c_str());
-                bool draw_pill = run.code && !hard_wrapped && piece_size.x + 10.0f * unit <= wrap_width;
-                if (draw_pill)
-                {
-                    ImVec2 pill_min = ImGui::GetCursorScreenPos();
-                    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pill_min.x - 5.0f * unit, pill_min.y - 1.0f), ImVec2(pill_min.x + piece_size.x + 5.0f * unit, pill_min.y + piece_size.y + 1.0f), ImGui::ColorConvertFloat4ToU32(ImVec4(colors.accent.x, colors.accent.y, colors.accent.z, 0.14f)), 6.0f * unit);
-                }
-                ImGui::PushStyleColor(ImGuiCol_Text, color);
-                ImGui::TextUnformatted(flow.c_str());
-                ImGui::PopStyleColor();
-                ImGui::PopFont();
 
-                bool last = i + 1 >= runs.size();
-                if (!last && !ends_line && !hard_wrapped)
-                    ImGui::SameLine(0.0f, 0.0f);
+                    float token_width = measure_text(font, font_size, token);
+                    bool fits = cursor_x + token_width <= wrap_right;
+                    if (!fits && cursor_x > origin.x)
+                        break_line();
+                    line_height = std::max(line_height, run_line_height);
+                    if (run.code && code_span_begin < 0.0f)
+                        code_span_begin = cursor_x;
+
+                    if (cursor_x + token_width > wrap_right)
+                    {
+                        for (size_t symbol_at = 0; symbol_at < token.size();)
+                        {
+                            size_t next = utf8::next_position(token, symbol_at);
+                            std::string symbol = token.substr(symbol_at, next - symbol_at);
+                            float symbol_width = measure_text(font, font_size, symbol);
+                            if (cursor_x + symbol_width > wrap_right)
+                                break_line();
+                            line_height = std::max(line_height, run_line_height);
+                            pieces.push_back({ symbol, ImVec2(cursor_x, cursor_y), font, font_size, tint, run.code });
+                            cursor_x += symbol_width;
+                            symbol_at = next;
+                        }
+                    }
+                    else
+                    {
+                        pieces.push_back({ token, ImVec2(cursor_x, cursor_y), font, font_size, tint, run.code });
+                        cursor_x += token_width;
+                    }
+                }
+
+                if (ends_line)
+                    break_line();
             }
         }
+        if (code_span_begin >= 0.0f)
+            close_code_span(cursor_x);
 
-        ImGui::PopTextWrapPos();
-        ImGui::PopStyleVar();
-        ImGui::Dummy(ImVec2(0.0f, 3.0f * unit));
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        for (const layout_rect_t& span : pill_rects)
+            draw->AddRectFilled(span.min_corner, span.max_corner, ImGui::ColorConvertFloat4ToU32(ImVec4(colors.accent.x, colors.accent.y, colors.accent.z, 0.14f)), 6.0f * unit);
+        for (const layout_piece_t& piece : pieces)
+            draw->AddText(piece.font, piece.size, piece.pos, piece.color, piece.text.c_str());
+
+        float bottom = cursor_y + (line_height > 0.0f ? line_height : 0.0f);
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, bottom + 3.0f * unit));
+        ImGui::Dummy(ImVec2(wrap_width, 3.0f * unit));
     }
 
     void render_code_block(c_ide_app& app, const md_block_t& block, int block_index, float wrap_width)
