@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Solution>
+  <Configurations>
+    <Configuration Name="Debug|x64">
+      <Platform Name="x64" />
+    </Configuration>
+    <Configuration Name="Release|x64">
+      <Platform Name="x64" />
+    </Configuration>
+  </Configurations>
+  <Project Path="amyrIDE.vcxproj" />
+</Solution>
