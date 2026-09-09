@@ -130,7 +130,7 @@ void c_chats_overlay::draw(c_ide_app& app)
     ImGui::PopStyleColor();
 
     float right_x = left_width + 1.0f * unit;
-    float right_width = card_size.x - right_width;
+    float right_width = card_size.x - right_x;
     ImGui::SetCursorPos(ImVec2(right_x, body_top));
     ImGui::BeginChild("##sessions_col", ImVec2(right_width, body_height), ImGuiChildFlags_None);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10.0f * unit);
